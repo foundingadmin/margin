@@ -1,24 +1,12 @@
 /* ===========================================================================
    Margin — side panel styles (v0.3)
    White light theme / clean dark theme. Block editor components.
+
+   Design tokens (color/type/radius/shadow) now live in tokens.css, loaded
+   before this file in sidepanel.html. This stylesheet consumes them by name
+   via var(--token) and owns layout + component styling only. See
+   docs/DESIGN_INTEGRATION.md for how a design handoff lands.
    =========================================================================== */
-:root {
-  --bg:#ffffff; --chrome:#f6f7f8; --surface-2:#eef0f2; --ink:#1b1c1e;
-  --muted:#62666c; --faint:#9aa0a6; --border:#e4e6e9;
-  --accent:#2f6fed; --accent-soft:#e8f0fe; --on-accent:#ffffff;
-  --danger:#c0392b; --shadow:0 8px 24px rgba(20,24,31,.12);
-  --radius:10px; --radius-sm:7px;
-  --ui:-apple-system,system-ui,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
-  --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
-  --mn-tint:rgba(20,24,31,.022);
-}
-.dark {
-  --bg:#1c1d1f; --chrome:#232427; --surface-2:#2c2e31; --ink:#e9eaec;
-  --muted:#a3a8af; --faint:#777c83; --border:#34363a;
-  --accent:#6f9bff; --accent-soft:#27314a; --on-accent:#11151c;
-  --danger:#ec6a5c; --shadow:0 10px 28px rgba(0,0,0,.45);
-  --mn-tint:rgba(255,255,255,.026);
-}
 * { box-sizing:border-box; }
 html,body { height:100%; margin:0; }
 body { background:var(--bg); color:var(--ink); font-family:var(--ui); font-size:14px; line-height:1.45; -webkit-font-smoothing:antialiased; }
