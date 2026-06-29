@@ -731,7 +731,14 @@ function bind() {
   });
   editor.addEventListener("click", (e) => {
     const c = e.target.closest && e.target.closest(".check");
-    if (c && editor.contains(c)) { const li = c.closest("li"); if (li) { li.classList.toggle("checked"); updateChecklistCounts(); queueSave(); } }
+    if (c && editor.contains(c)) { const li = c.closest("li"); if (li) { li.classList.toggle("checked"); updateChecklistCounts(); queueSave(); } return; }
+    // Links inside a contenteditable don't navigate — a click just drops the caret. Open them
+    // ourselves so citation links and inline links are actually active.
+    const a = e.target.closest && e.target.closest("a[href]");
+    if (a && editor.contains(a)) {
+      const href = a.getAttribute("href") || "";
+      if (/^(https?:|mailto:)/i.test(href)) { e.preventDefault(); window.open(href, "_blank", "noopener,noreferrer"); }
+    }
   });
 
   // style dropdown
