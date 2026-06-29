@@ -16,9 +16,11 @@ Want to track the repo instead of re-downloading a zip? Chrome can't load an unp
    git clone https://github.com/foundingadmin/margin.git "$HOME/Custom Apps/margin"
    ```
    Then **Load unpacked** → pick that `margin` folder.
-2. **After any merge to `main`**, double-click **`update-margin.command`** in the folder (it pulls the latest and pops open `chrome://extensions`), then hit the reload ↻ on the Margin card.
+2. **After any merge to `main`**, double-click **`update-margin.command`** in the folder (it pulls the latest and pops open `chrome://extensions` in **Comet**), then hit the reload ↻ on the Margin card.
 
-The script clones if the folder is missing and fast-forwards to `main` if it's there, so the same file bootstraps and updates. Override the location with `MARGIN_DIR=…` if you keep it elsewhere. (macOS may ask you to confirm the first run of a `.command` file — right-click → **Open** once.)
+The script clones if the folder is missing, fast-forwards to `main` if it's already a checkout, and — if you *unzipped* the folder instead of cloning (so it has no `.git`) — converts it into a checkout in place on first run. It targets the Margin repo specifically: it will refuse to touch a parent folder that happens to be some *other* git repo (e.g. a home directory that's itself a checkout). Override the location with `MARGIN_DIR=…` if you keep it elsewhere.
+
+> **macOS blocked it?** ("Apple could not verify… Not Opened.") That's Gatekeeper quarantine on a downloaded script, not malware. Either **System Settings → Privacy & Security → Open Anyway**, or clear the flag once in Terminal: `xattr -d com.apple.quarantine "<path>/update-margin.command"`. Cloning the repo (rather than downloading a zip) avoids the quarantine flag entirely.
 
 ## Set your own keyboard shortcut
 The ⋯ menu → **Set keyboard shortcut…** opens `chrome://extensions/shortcuts`. Click the row for **Open or close Margin**, press your combo (Chrome requires Ctrl/Alt/⌘ in it), and flip the dropdown to **Global** if you want it to fire even when Chrome isn't focused.

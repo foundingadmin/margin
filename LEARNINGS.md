@@ -52,6 +52,12 @@ The side panel's top strip (app name, pin, close) is **Chrome-drawn and uncontro
 
 ---
 
+## Updater (`update-margin.command`)
+
+**`git rev-parse --show-toplevel` walks UP — never adopt the result blindly.** The "update in place" path found the repo *containing* the script, but an unzipped Margin folder (no `.git`) nested under a home directory that is *itself* a git checkout resolved to the **home repo** — so the updater `git reset --hard`'d the wrong repository and never touched the extension. Guard it: adopt the discovered repo only when its `origin` remote matches `foundingadmin/margin`. Otherwise fall back to the target folder and, if that folder exists without a `.git`, convert it in place (`git init` + add origin + `fetch` + `reset --hard origin/main`) — `reset --hard` overwrites tracked files but leaves unrelated untracked files alone, and never reaches outside the folder.
+
+**Prefer `git clone` over an unzipped download** for the synced copy: clones carry no `com.apple.quarantine` flag (so Gatekeeper doesn't block the `.command`) and are already proper checkouts (so the updater's fast path works without the in-place conversion).
+
 ## Data model
 
 **Page identity is `origin + pathname`** (lowercased, trailing slash trimmed; query/hash dropped). Non-http falls back to host. The planned evolution is a **`sources[]` set of full URLs** per note — the one structural fork that unlocks merge, multi-URL association, and provenance. Treat it as a migration when it lands.
