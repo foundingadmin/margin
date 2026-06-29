@@ -1,0 +1,39 @@
+# Dependencies
+node_modules/
+.pnp/
+.pnp.js
+
+# Secrets / environment
+.env
+.env.*
+!.env.example
+*.pem
+key.pem
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editor / IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Packaged extension artifacts
+*.zip
+*.crx
+
+# Build output — uncomment if your extension is built from source and you
+# don't want the generated output committed:
+# dist/
+# build/
+# out/
