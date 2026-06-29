@@ -1,5 +1,21 @@
 # Margin — version log
 
+## v0.10.0 — 2026-06-29
+
+Provenance & capture (Roadmap Phase 3) — paste-from-page (#5) + provenance display (#6), shipped as a pair.
+
+- **Paste-from-page (#5)** — a new command (`⌘/Ctrl+Shift+Y`, rebindable) reads the active tab's **live selection** via the `scripting` permission, opens the panel, and drops the text into the note you're **currently viewing** at the last caret position — not the page's note, not the end. Distinct from right-click capture: a plain paste rather than a blockquote+citation, and the page joins the note's `sources[]` set. The source is **certain** because it's read off the live page.
+- **Provenance display (#6)** — pasted-from-page blocks carry `data-src` / `data-srchost` (and a full-URL `title`). A per-note **Show paste sources** toggle in the ⋯ menu adds a `.show-prov` class that reveals a faint *from ‹host›* line under each sourced block, with the full URL on hover. Off by default — the note reads clean until asked. The menu item only appears when the note actually holds pasted blocks.
+- **Scope/decision:** only the *certain* path is tagged. Free-form `⌘V` pastes are **not** marked — the browser can't reveal the true copy source, and the roadmap flagged that as a guess. Keeping every `data-src` trustworthy beats polluting provenance with guesses.
+- B4 (locked-note capture target) and B5 (insert at caret, not the end) were already handled in the panel-side capture path; paste-from-page reuses that same plumbing.
+
+## v0.9.0 — 2026-06-29
+
+Note info (Roadmap Phase 2, #2) — the last Phase 2 slice, built on the `sources[]` model.
+
+- **Note info (#2)** — the note ⋯ menu gains **Note info**, a panel that surfaces a note's **source URL(s)** (the full provenance URLs, click to open in a new tab), plus its **created** and **updated** timestamps (absolute stamp, with a relative "x ago" on updated). The data already lived on every note since the `sources[]` model — this is the on-demand view of it. Notes that predate `sources[]` only carried a page path, so that's what they show.
+- Closes out Phase 2 (sources[] → Merge → Note info). The remaining multiselect slice (bulk **pin**, #1) is the only Theme-1 item left.
+
 ## v0.8.0 — 2026-06-29
 
 Merge notes (Roadmap Phase 2, #3) — the second slice of multiselect management, built on the `sources[]` model.

@@ -36,6 +36,8 @@
         <button data-act="export">Download .html</button>
         <button data-act="pin"><span id="pin-label">Pin note</span></button>
         <button data-act="mnumbers"><span id="mn-label">Show Margin Numbers</span></button>
+        <button data-act="prov" id="prov-item" hidden><span id="prov-label">Show paste sources</span></button>
+        <button data-act="info">Note info</button>
         <div class="menu-sep"></div>
         <button data-act="delete" class="danger">Delete note</button>
       </div>
@@ -78,6 +80,7 @@
       <div id="style-menu" class="style-menu" hidden></div>
       <div id="size-menu" class="popover size-menu" hidden></div>
       <div id="color-pop" class="popover" hidden></div>
+      <div id="note-info" class="popover info-pop" hidden></div>
       <div id="slash" class="slash" hidden></div>
       <input id="image-input" type="file" accept="image/*" hidden />
     </section>
