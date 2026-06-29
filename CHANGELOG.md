@@ -1,5 +1,16 @@
 # Margin — version log
 
+## v0.6.0 — 2026-06-29
+
+Editor wins (Roadmap Phase 1) — high-visibility, no new data model.
+
+- **Margin Numbers (#7)** — a per-note toggle in the note ⋯ menu that numbers each block down a faint, code-editor-style left gutter, legal/hierarchical: top-level blocks `1, 2, 3`; nested list items and table rows `12.1, 12.2`. A very subtle alternating row tint shows each number's span. Strictly a live positional aid — it renumbers as you edit, not a permanent ID.
+- **Text size (#10)** — a sizer in the toolbar (Small / Regular / Large / Supersize) that scales *all* styles in a note equally. It's a persisted setting (sticks across notes), placed where people expect sizing to live. Accessibility, not per-selection formatting.
+- **Selection word count (#11)** — the footer shows the live word count of the current selection beside the note total.
+- **Lists & indenting (#8)** — `⌘/Ctrl+]` / `[` indent and outdent lists *and* plain paragraphs (the latter now persists); a little more line-space between list items. (Tab / Shift-Tab list indent shipped earlier with B2.)
+- **Rename affordance (#18)** — hovering a note's title eases in a pencil icon and tints the title toward the accent, signalling "click to rename."
+- **Default to dark (#17)** — the side panel opens in dark mode on first run.
+
 ## v0.5.0 — 2026-06-29
 
 Navigation & UX overhaul.

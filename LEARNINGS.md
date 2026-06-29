@@ -44,6 +44,12 @@ The side panel's top strip (app name, pin, close) is **Chrome-drawn and uncontro
 
 **Sanitize every byte of pasted or captured HTML** through the whitelist (`ALLOWED_TAGS` / `ALLOWED_CLASSES` / `STYLE_PROPS`). Never trust clipboard or web HTML. Keep block markup (callout, checklist, badge, link-card, `data-count`) on the allow-list deliberately; strip everything else.
 
+**Whatever `execCommand` writes inline must be on `STYLE_PROPS`, or it won't survive a save.** With `styleWithCSS` on, `indent`/`outdent` on a *non-list* block writes `margin-left` inline. That's why `⌘]`/`⌘[` indent of plain paragraphs needs `margin-left` whitelisted — list indent changes nesting (no inline style) and was always safe, but the plain-text case silently reverted until the prop was allowed.
+
+**Margin Numbers ride CSS counters on the editor's block sequence — no DOM/markup change.** `.editor.numbered` resets `mn`; each top-level child increments it and renders `counter(mn)` in the left gutter (absolute `::before`, positioned into extra `padding-left`). Lists/tables instead reset a second `mnsub` and render `counter(mn) "." counter(mnsub)` on their `li`/`tr` — and the container's *own* number is deliberately **not** drawn, because it would collide with `n.1` on the first line. So a list is section "12" only implicitly; its rows are 12.1, 12.2. The toggle is a per-note property (`n.numbered`), applied as a class on the editor element — it lives outside the note HTML, so the sanitizer never sees it.
+
+**Whole-note text scaling is just the editor's base `font-size`.** Headings, badges, quotes, code are all `em`-based, so one class on `.editor` (`size-small|regular|large|supersize`) scales everything proportionally. The only px holdout was `pre`, switched to `em` to come along. It's a persisted *setting* (sticks across notes), not inline formatting.
+
 ---
 
 ## Data model
