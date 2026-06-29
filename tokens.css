@@ -1,0 +1,47 @@
+/* ===========================================================================
+   Margin — design tokens (the design-system seam)
+   ---------------------------------------------------------------------------
+   This file is the single source of truth for color, type, radius, and shadow.
+   It is the intended drop-in point for a UI design package from Claude Design:
+   a handoff updates the VALUES here, and the rest of the CSS — which only ever
+   references these via var(--token) — re-themes for free.
+
+   Rules of the road (see docs/DESIGN_INTEGRATION.md):
+   - Keep token NAMES stable. sidepanel.css consumes them by name.
+   - Light values live on :root; dark overrides live on .dark (the <body> gets
+     the `dark` class toggled by the theme button). Default theme is dark.
+   - Everything must stay local/self-contained — MV3 CSP forbids remote fonts
+     or stylesheets. Bundle font files in the repo if a handoff adds a typeface.
+   - Loaded BEFORE sidepanel.css in sidepanel.html so these definitions win the
+     cascade as the base layer.
+   =========================================================================== */
+
+:root {
+  /* surfaces */
+  --bg:#ffffff; --chrome:#f6f7f8; --surface-2:#eef0f2;
+  /* text */
+  --ink:#1b1c1e; --muted:#62666c; --faint:#9aa0a6;
+  /* lines */
+  --border:#e4e6e9;
+  /* accent + states */
+  --accent:#2f6fed; --accent-soft:#e8f0fe; --on-accent:#ffffff;
+  --danger:#c0392b;
+  /* elevation + shape */
+  --shadow:0 8px 24px rgba(20,24,31,.12);
+  --radius:10px; --radius-sm:7px;
+  /* type */
+  --ui:-apple-system,system-ui,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+  /* Margin Numbers gutter row tint */
+  --mn-tint:rgba(20,24,31,.022);
+}
+
+.dark {
+  --bg:#1c1d1f; --chrome:#232427; --surface-2:#2c2e31;
+  --ink:#e9eaec; --muted:#a3a8af; --faint:#777c83;
+  --border:#34363a;
+  --accent:#6f9bff; --accent-soft:#27314a; --on-accent:#11151c;
+  --danger:#ec6a5c;
+  --shadow:0 10px 28px rgba(0,0,0,.45);
+  --mn-tint:rgba(255,255,255,.026);
+}

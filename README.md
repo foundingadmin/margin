@@ -72,6 +72,8 @@ Notes are stored locally via `chrome.storage.local` and never leave your machine
 - `manifest.json` — MV3 config, commands, permissions.
 - `background.js` — panel toggle, selection capture, link-card metadata fetch.
 - `sidepanel.html / .css / .js` — the editor.
+- `tokens.css` — design tokens (color/type/radius/shadow); the design-system seam.
+- `docs/DESIGN_INTEGRATION.md` — how a UI design package from Claude Design lands.
 - `icons/` — the mark.
 
 ## Known limits (honest list)
