@@ -6,6 +6,8 @@ const SETTINGS_KEY = "margin.settings";
 const $ = (id) => document.getElementById(id);
 const now = () => Date.now();
 let editor; // set on init
+let captureCaretRange = null; // last caret position inside the editor (for capture insertion — B5)
+let lastActiveId = null;      // id of the most recently opened note (for locked capture when reopened — B4)
 
 let state = {
   notes: [], settings: { theme: "light", follow: false, sort: "updated" }, host: null, pageKey: null, tabInfo: null, activeId: null, query: "", selectMode: false, selected: new Set()
@@ -181,7 +183,8 @@ function activeNote() { return state.notes.find((x) => x.id === state.activeId);
 function ensureCssMode() { if (!cssModeSet) { try { document.execCommand("styleWithCSS", false, true); } catch (e) {} cssModeSet = true; } }
 function openNote(id) {
   const n = state.notes.find((x) => x.id === id); if (!n) return;
-  state.activeId = id;
+  state.activeId = id; lastActiveId = id;
+  try { chrome.storage.session.set({ "margin.activeId": id }); } catch (e) {}
   $("title").value = n.title || "";
   editor.innerHTML = sanitizeHtml(n.html || "");
   updateChecklistCounts();
@@ -307,6 +310,11 @@ function makeChecklist() {
 function currentChecklistLi() {
   let n = window.getSelection().anchorNode; if (!n) return null;
   while (n && n !== editor) { if (n.tagName === "LI" && n.parentNode && n.parentNode.classList && n.parentNode.classList.contains("checklist")) return n; n = n.parentNode; }
+  return null;
+}
+function currentListItem() {
+  let n = window.getSelection().anchorNode; if (!n) return null;
+  while (n && n !== editor) { if (n.nodeType === 1 && n.tagName === "LI") return n; n = n.parentNode; }
   return null;
 }
 function updateChecklistCounts() {
@@ -532,6 +540,51 @@ let tabTimer = null;
 function onTabChangedDebounced() { clearTimeout(tabTimer); tabTimer = setTimeout(onTabChanged, 160); }
 async function setFollow(on) { state.settings.follow = on; applyLockIcon(); saveSettings(); if (on) { await refreshHost(); await loadActiveTabNote(); } }
 
+/* ---------- selection capture (consumed from the worker's pendingCapture) ---------- */
+function saveCaptureCaret() { const s = window.getSelection(); if (s.rangeCount && editor.contains(s.anchorNode)) captureCaretRange = s.getRangeAt(0).cloneRange(); }
+function restoreCaptureCaret() {
+  if (!captureCaretRange || !editor.contains(captureCaretRange.startContainer)) return false;
+  const s = window.getSelection(); s.removeAllRanges(); s.addRange(captureCaretRange); return true;
+}
+// Resolve (or create) the note for a capture's own page — mirrors the old worker logic, panel-side.
+function captureTargetNote(cap) {
+  const pk = cap.pageKey, host = cap.host;
+  let n = state.notes.filter((x) => pk ? x.pageKey === pk : (x.host === host && !x.pageKey)).sort((a, b) => b.updatedAt - a.updatedAt)[0];
+  if (!n) {
+    const title = autoTitle(host, pageTag({ url: cap.url, title: cap.title }));
+    n = { id: uid(), title, autoTitle: title, html: "", host: host || null, pageKey: pk || null, pinned: false, ephemeral: false, createdAt: now(), updatedAt: now() };
+    state.notes.unshift(n);
+  }
+  return n;
+}
+async function consumePendingCapture() {
+  let cap;
+  try { const d = await chrome.storage.session.get("margin.pendingCapture"); cap = d["margin.pendingCapture"]; } catch (e) { return false; }
+  if (!cap || !cap.html) return false;
+  await chrome.storage.session.remove("margin.pendingCapture");
+  if (now() - (cap.at || 0) > 15000) return false; // stale (e.g. browser restarted) — drop it
+
+  const locked = !state.settings.follow; // locked = the note stays put regardless of tab
+  let target = locked ? (activeNote() || (lastActiveId && state.notes.find((n) => n.id === lastActiveId)) || null) : null;
+  if (!target) target = captureTargetNote(cap); // unlocked, or nothing open: resolve by the capture's page
+  if (!target) return false;
+  target.ephemeral = false;
+
+  if (state.activeId === target.id && isEditorView()) {
+    // Inserting into the note you're looking at — drop it at the last caret, not the end (B5).
+    editor.focus();
+    if (!restoreCaptureCaret()) caretIntoEnd(editor);
+    document.execCommand("insertHTML", false, sanitizeHtml(cap.html));
+    updateChecklistCounts(); queueSave();
+  } else {
+    target.html = (target.html && target.html.trim() ? target.html : "") + cap.html;
+    target.updatedAt = now();
+    await saveNotes();
+    openNote(target.id);
+  }
+  return true;
+}
+
 /* ---------- keyboard ---------- */
 function onKeydown(e) {
   if (!$("slash").hidden) {
@@ -542,6 +595,20 @@ function onKeydown(e) {
   }
   const meta = e.metaKey || e.ctrlKey;
   const inEditor = document.activeElement === editor;
+  // B2: inside a list, Tab/Shift-Tab indents/outdents instead of moving focus to the next
+  // focusable element (a toggle's <summary>), which is what made it "jump to a far-off block".
+  if (inEditor && e.key === "Tab" && !meta && !e.altKey) {
+    const li = currentListItem();
+    if (li) {
+      e.preventDefault();
+      // Checklist nesting isn't modelled yet; still swallow Tab so it can't leap focus away.
+      if (!(li.parentNode && li.parentNode.classList && li.parentNode.classList.contains("checklist"))) {
+        document.execCommand(e.shiftKey ? "outdent" : "indent");
+        queueSave(); syncToolbar();
+      }
+      return;
+    }
+  }
   if (inEditor && e.altKey && meta && /^Digit[0-3]$/.test(e.code)) { e.preventDefault(); applyStyle({ Digit0: "P", Digit1: "H1", Digit2: "H2", Digit3: "H3" }[e.code]); return; }
   if (inEditor && meta && e.shiftKey && e.code === "Digit8") { e.preventDefault(); return exec("insertUnorderedList"); }
   if (inEditor && meta && e.shiftKey && e.code === "Digit7") { e.preventDefault(); return exec("insertOrderedList"); }
@@ -731,7 +798,14 @@ function bind() {
   });
   editor.addEventListener("click", (e) => {
     const c = e.target.closest && e.target.closest(".check");
-    if (c && editor.contains(c)) { const li = c.closest("li"); if (li) { li.classList.toggle("checked"); updateChecklistCounts(); queueSave(); } }
+    if (c && editor.contains(c)) { const li = c.closest("li"); if (li) { li.classList.toggle("checked"); updateChecklistCounts(); queueSave(); } return; }
+    // Links inside a contenteditable don't navigate — a click just drops the caret. Open them
+    // ourselves so citation links and inline links are actually active.
+    const a = e.target.closest && e.target.closest("a[href]");
+    if (a && editor.contains(a)) {
+      const href = a.getAttribute("href") || "";
+      if (/^(https?:|mailto:)/i.test(href)) { e.preventDefault(); window.open(href, "_blank", "noopener,noreferrer"); }
+    }
   });
 
   // style dropdown
@@ -749,7 +823,7 @@ function bind() {
   $("bulk-all").addEventListener("click", bulkSelectAll);
   $("bulk-delete").addEventListener("click", bulkDelete);
 
-  document.addEventListener("selectionchange", () => { if (document.activeElement === editor) syncToolbar(); });
+  document.addEventListener("selectionchange", () => { if (document.activeElement === editor) { syncToolbar(); saveCaptureCaret(); } });
   document.addEventListener("keydown", onKeydown);
 
   document.addEventListener("click", (e) => {
@@ -763,6 +837,7 @@ function bind() {
   });
 
   chrome.storage.onChanged.addListener((changes, area) => {
+    if (area === "session" && changes["margin.pendingCapture"] && changes["margin.pendingCapture"].newValue) { consumePendingCapture(); return; }
     if (area !== "local" || !changes[STORE_KEY]) return;
     state.notes = changes[STORE_KEY].newValue || [];
     if (!isEditorView()) { renderList(); return; }
@@ -785,8 +860,28 @@ function exportNote() {
   setTimeout(() => URL.revokeObjectURL(url), 1000); $("note-menu").hidden = true;
 }
 
-/* ---------- close-port ---------- */
-(async () => { try { const win = await chrome.windows.getCurrent(); const port = chrome.runtime.connect({ name: "panel:" + win.id }); port.onMessage.addListener((m) => { if (m && m.type === "close") window.close(); }); } catch (e) {} })();
+/* ---------- close-port ----------
+   The worker tracks "is this window's panel open?" via this port. MV3 workers sleep and
+   wipe that map, so we reconnect whenever the port drops (re-announcing open=true to the
+   freshly-woken worker) and ping periodically to keep it warm — this is what makes the
+   toggle shortcut deterministic instead of sporadic. A broadcast "closePanel" covers the
+   case where the worker restarted cold and only has a rehydrated, port-less entry. */
+(async () => {
+  let win;
+  try { win = await chrome.windows.getCurrent(); } catch (e) { return; }
+  const wid = win.id;
+  let port = null;
+  const connect = () => {
+    try {
+      port = chrome.runtime.connect({ name: "panel:" + wid });
+      port.onMessage.addListener((m) => { if (m && m.type === "close") window.close(); });
+      port.onDisconnect.addListener(() => { port = null; setTimeout(connect, 200); });
+    } catch (e) { port = null; }
+  };
+  connect();
+  setInterval(() => { try { if (port) port.postMessage({ type: "ping" }); else connect(); } catch (e) {} }, 20000);
+  chrome.runtime.onMessage.addListener((m) => { if (m && m.type === "closePanel" && m.windowId === wid) window.close(); });
+})();
 
 /* ---------- boot ---------- */
 async function init() {
@@ -794,9 +889,9 @@ async function init() {
   applyTheme(); applyLockIcon();
   bind();
   await refreshHost();
-  const flag = await chrome.storage.local.get(["margin.lastCapture", "margin.lastCaptureAt"]);
-  if (flag["margin.lastCaptureAt"] && now() - flag["margin.lastCaptureAt"] < 5000 && flag["margin.lastCapture"] && state.notes.some((n) => n.id === flag["margin.lastCapture"])) openNote(flag["margin.lastCapture"]);
-  else await ensureForActiveTab();
-  await chrome.storage.local.remove(["margin.lastCapture", "margin.lastCaptureAt"]);
+  try { const d = await chrome.storage.session.get("margin.activeId"); lastActiveId = d["margin.activeId"] || null; } catch (e) {}
+  // A right-click capture may have opened us; let it place the note. Otherwise open the tab's note.
+  const handled = await consumePendingCapture();
+  if (!handled) await ensureForActiveTab();
 }
 init();
