@@ -25,7 +25,7 @@ The *second* thing these dumps reveal: the **editor itself is maturing** — lis
 
 ### ✅ Shipped in v0.8.0 (Phase 2 — Merge)
 
-**Merge notes (#3)** landed on top of the `sources[]` model: in the all-notes Select mode, pick 2+ notes → **Merge** folds them into one — bodies **newest-on-top** with a divider, the **newest title** kept, **source sets unioned** (pinned if any were; created-date the oldest). A **toast with Undo** replaces a confirm dialog. This is also the second slice of multiselect management (#1), joining bulk delete. Next in Phase 2: **Note info (#2)**.
+**Merge notes (#3)** landed on top of the `sources[]` model: in the all-notes Select mode, pick 2+ notes → **Merge** folds them into one — bodies **newest-on-top** with a divider, each section **headed by its original title**, the **newest title** becoming the merged note's own, **source sets unioned** (pinned if any were; created-date the oldest). A **toast with Undo** replaces a confirm dialog. This is also the second slice of multiselect management (#1), joining bulk delete. Next in Phase 2: **Note info (#2)**.
 
 ### ✅ Shipped in v0.7.0 (Phase 2 keystone — the `sources[]` model)
 
@@ -77,7 +77,7 @@ Nav/UX overhaul landed: **blue icon** (one mid-tone glyph legible on every surfa
 
 **2. Note info menu — associated URL(s), created, updated** — data already exists on every note. Full URL now stored (decided), shown on demand. **Lift:** S. *Pre-change notes have only the path to show.*
 
-**3. Merge notes — newest content on top** — ✅ **shipped v0.8.0.** Selected notes concatenate by `updatedAt` desc with an `<hr>` between bodies; source sets union. Resolved watch-items: the **newest note's title** survives, originals are **consumed** (replaced by the merged note) with a **toast Undo** instead of a confirm dialog. **Lift:** M.
+**3. Merge notes — newest content on top** — ✅ **shipped v0.8.0.** Selected notes concatenate by `updatedAt` desc with an `<hr>` between bodies; each section is **headed by its original title** (inline `<h2>`) so the merged chunks stay legible; source sets union. Resolved watch-items: the **newest note's title** becomes the merged note's own, originals are **consumed** (replaced by the merged note) with a **toast Undo** instead of a confirm dialog. **Lift:** M.
 
 **4. Multi-URL association — one note across many pages when unlocked** *(the keystone / the one real fork)* — ✅ **shipped v0.7.0.** A note's `pageKey` became a `sources[]` set: each entry holds the **full URL** (the provenance trail, rarely shown) keyed by normalized page (origin + path) for matching (the association set — where the note surfaces unlocked). A note matches the current page if *any* source matches; **capture unions** the captured page into the note's set, so one note can span every page it borrowed from. Legacy notes migrate automatically on first load. Merge (#3) and Note info (#2) consume this model. **Lift:** M.
 

@@ -620,7 +620,10 @@ async function bulkMerge() {
   const picked = state.notes.filter((n) => state.selected.has(n.id));
   if (picked.length < 2) return;
   const ordered = picked.slice().sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0)); // newest content on top
-  const body = ordered.map((n) => (n.html && n.html.trim()) ? n.html : "").filter(Boolean).join("<hr>"); // a rule between bodies
+  // Each section keeps its original title as an inline heading above its contents, so the
+  // merged note shows where each chunk came from; the newest title still becomes the note's own.
+  const esc = (s) => String(s).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+  const body = ordered.map((n) => `<h2>${esc(n.title || "Untitled")}</h2>` + ((n.html && n.html.trim()) ? n.html : "")).join("<hr>");
   const sources = [];
   ordered.forEach((n) => (n.sources || []).forEach((s) => unionSourceInto(sources, s)));
   const newest = ordered[0]; // the newest note's title survives (its content leads)
@@ -780,14 +783,14 @@ const GUIDE_HTML = `
 <p>A note remembers <strong>every page it's drawn from</strong> — its sources. Capture from another page into a note and that page joins the note's set; unlocked, the note then surfaces on <em>any</em> of those pages. The exact source URLs are kept (for provenance) but stay out of the way until you ask for them.</p>
 <p>Right-click any selection on a page → <strong>Save selection to Margin</strong> drops it as a sourced quote into that page's note.</p>
 <h2>Organising notes</h2>
-<p>On the all-notes list, hit <strong>Select</strong> to multi-pick. From there you can <strong>Delete</strong> in bulk, or <strong>Merge</strong> two or more into one — bodies stack newest-on-top with a divider, the newest title is kept, and every page the notes came from is pooled into the merged note's sources. A merge can be <strong>undone</strong> from the toast that appears.</p>
+<p>On the all-notes list, hit <strong>Select</strong> to multi-pick. From there you can <strong>Delete</strong> in bulk, or <strong>Merge</strong> two or more into one — bodies stack newest-on-top with a divider, and each chunk is headed by its original title so you can tell the pieces apart. The newest note's title becomes the merged note's, and every page the notes came from is pooled into its sources. A merge can be <strong>undone</strong> from the toast that appears.</p>
 <h2>Privacy</h2>
 <p>Notes live locally via <code>chrome.storage.local</code> and never leave your machine. Broad host access exists only so link cards can fetch a URL's preview; no scripts run on pages.</p>
 `;
 const CHANGELOG_HTML = `
 <div class="ver"><span class="ver-tag">v0.8.0</span><span class="ver-date">Jun 29, 2026</span></div>
 <ul>
-<li><strong>Merge notes</strong> — in <strong>Select</strong> mode on the all-notes list, choose two or more and hit <strong>Merge</strong>. They become one note: bodies <strong>newest on top</strong> with a divider between, the newest title kept, and every page they came from pooled into one set.</li>
+<li><strong>Merge notes</strong> — in <strong>Select</strong> mode on the all-notes list, choose two or more and hit <strong>Merge</strong>. They become one note: bodies <strong>newest on top</strong> with a divider between, each chunk <strong>headed by its original title</strong> so you can see where it came from. The newest note's title becomes the merged note's own, and every page they came from is pooled into one set.</li>
 <li><strong>Undo</strong> — a merge pops a toast with <strong>Undo</strong> for a few seconds, so it's safe to try; one click puts the originals back.</li>
 </ul>
 <div class="ver"><span class="ver-tag">v0.7.0</span><span class="ver-date">Jun 29, 2026</span></div>
