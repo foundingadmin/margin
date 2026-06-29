@@ -309,6 +309,11 @@ function currentChecklistLi() {
   while (n && n !== editor) { if (n.tagName === "LI" && n.parentNode && n.parentNode.classList && n.parentNode.classList.contains("checklist")) return n; n = n.parentNode; }
   return null;
 }
+function currentListItem() {
+  let n = window.getSelection().anchorNode; if (!n) return null;
+  while (n && n !== editor) { if (n.nodeType === 1 && n.tagName === "LI") return n; n = n.parentNode; }
+  return null;
+}
 function updateChecklistCounts() {
   editor.querySelectorAll("ul.checklist").forEach((ul) => {
     const items = ul.querySelectorAll(":scope > li");
@@ -542,6 +547,20 @@ function onKeydown(e) {
   }
   const meta = e.metaKey || e.ctrlKey;
   const inEditor = document.activeElement === editor;
+  // B2: inside a list, Tab/Shift-Tab indents/outdents instead of moving focus to the next
+  // focusable element (a toggle's <summary>), which is what made it "jump to a far-off block".
+  if (inEditor && e.key === "Tab" && !meta && !e.altKey) {
+    const li = currentListItem();
+    if (li) {
+      e.preventDefault();
+      // Checklist nesting isn't modelled yet; still swallow Tab so it can't leap focus away.
+      if (!(li.parentNode && li.parentNode.classList && li.parentNode.classList.contains("checklist"))) {
+        document.execCommand(e.shiftKey ? "outdent" : "indent");
+        queueSave(); syncToolbar();
+      }
+      return;
+    }
+  }
   if (inEditor && e.altKey && meta && /^Digit[0-3]$/.test(e.code)) { e.preventDefault(); applyStyle({ Digit0: "P", Digit1: "H1", Digit2: "H2", Digit3: "H3" }[e.code]); return; }
   if (inEditor && meta && e.shiftKey && e.code === "Digit8") { e.preventDefault(); return exec("insertUnorderedList"); }
   if (inEditor && meta && e.shiftKey && e.code === "Digit7") { e.preventDefault(); return exec("insertOrderedList"); }
