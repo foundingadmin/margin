@@ -1,5 +1,12 @@
 # Margin — version log
 
+## v0.9.0 — 2026-06-29
+
+Note info (Roadmap Phase 2, #2) — the last Phase 2 slice, built on the `sources[]` model.
+
+- **Note info (#2)** — the note ⋯ menu gains **Note info**, a panel that surfaces a note's **source URL(s)** (the full provenance URLs, click to open in a new tab), plus its **created** and **updated** timestamps (absolute stamp, with a relative "x ago" on updated). The data already lived on every note since the `sources[]` model — this is the on-demand view of it. Notes that predate `sources[]` only carried a page path, so that's what they show.
+- Closes out Phase 2 (sources[] → Merge → Note info). The remaining multiselect slice (bulk **pin**, #1) is the only Theme-1 item left.
+
 ## v0.8.0 — 2026-06-29
 
 Merge notes (Roadmap Phase 2, #3) — the second slice of multiselect management, built on the `sources[]` model.

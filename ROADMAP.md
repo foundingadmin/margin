@@ -23,6 +23,10 @@ The *second* thing these dumps reveal: the **editor itself is maturing** — lis
 - **Default theme — dark.** The side panel opens in dark mode by default.
 - **"Badge," never "highlight."** Highlight as a concept is retired; the term and the tool are *badge* everywhere.
 
+### ✅ Shipped in v0.9.0 (Phase 2 — Note info)
+
+**Note info (#2)** landed, closing out Phase 2. The note ⋯ menu now carries **Note info** → a panel that reads straight off the `sources[]` model: every **source URL** the note was drawn from (full provenance URLs, click to open in a new tab), plus **created** and **updated** stamps (absolute, with a relative "x ago" on updated). Pre-`sources[]` notes only ever stored a page path, so that's what they surface. The Phase 2 arc (sources[] → Merge → Note info) is complete; the only remaining Theme-1 slice is bulk **pin** (#1).
+
 ### ✅ Shipped in v0.8.0 (Phase 2 — Merge)
 
 **Merge notes (#3)** landed on top of the `sources[]` model: in the all-notes Select mode, pick 2+ notes → **Merge** folds them into one — bodies **newest-on-top** with a divider, each section **headed by its original title**, the **newest title** becoming the merged note's own, **source sets unioned** (pinned if any were; created-date the oldest). A **toast with Undo** replaces a confirm dialog. This is also the second slice of multiselect management (#1), joining bulk delete. Next in Phase 2: **Note info (#2)**.
@@ -75,7 +79,7 @@ Nav/UX overhaul landed: **blue icon** (one mid-tone glyph legible on every surfa
 
 **1. Multiselect note management** *(bulk delete shipped v0.4.3; merge shipped v0.8.0)* — selection scaffold now does delete + merge. Remaining slice: bulk **pin**. **Lift:** S.
 
-**2. Note info menu — associated URL(s), created, updated** — data already exists on every note. Full URL now stored (decided), shown on demand. **Lift:** S. *Pre-change notes have only the path to show.*
+**2. Note info menu — associated URL(s), created, updated** — ✅ **shipped v0.9.0.** A **Note info** entry in the note ⋯ menu opens a panel reading off `sources[]`: every source URL (full, click-to-open), plus created / updated stamps. Pre-`sources[]` notes show only the page path they migrated with. **Lift:** S.
 
 **3. Merge notes — newest content on top** — ✅ **shipped v0.8.0.** Selected notes concatenate by `updatedAt` desc with an `<hr>` between bodies; each section is **headed by its original title** (inline `<h2>`) so the merged chunks stay legible; source sets union. Resolved watch-items: the **newest note's title** becomes the merged note's own, originals are **consumed** (replaced by the merged note) with a **toast Undo** instead of a confirm dialog. **Lift:** M.
 
@@ -165,7 +169,7 @@ Nav/UX overhaul landed: **blue icon** (one mid-tone glyph legible on every surfa
 
 - **Phase 0 — Squash the bugs (B1–B5).** Correctness first; most are S–M and several (B2/B4/B5) fold into features you're building anyway.
 - **Phase 1 — Editor wins that don't need new data:** ✅ **shipped in v0.6.0** — Margin Numbers (#7), Lists (#8), Text size (#10), Selection count (#11), Title hover (#18), Default dark (#17). *(Contextual title #19 and the nav/icon work shipped in v0.5.0.)*
-- **Phase 2 — The `sources[]` model (#4) → Merge (#3) → Note info (#2).** ✅ #4 shipped v0.7.0; ✅ Merge (#3) shipped v0.8.0. **Next up: Note info (#2)** — surface a note's source URLs / created / updated. (Plus the small remaining multiselect slice: bulk **pin**, #1.)
+- **Phase 2 — The `sources[]` model (#4) → Merge (#3) → Note info (#2).** ✅ #4 shipped v0.7.0; ✅ Merge (#3) shipped v0.8.0; ✅ Note info (#2) shipped v0.9.0 — Phase 2 complete. **Remaining Theme-1 slice:** bulk **pin** (#1). **Next theme: Phase 3 — Provenance & capture** (Paste-from-page #5 + provenance display #6, shipped as a pair; B4/B5 fold into the same capture path).
 - **Phase 3 — Provenance & capture:** Paste-from-page (#5) + provenance display (#6). Same plumbing; ship as a pair.
 - **Phase 4 — Rich media:** Images (#14) → filetypes (#15). Media before TOC since they're more-used.
 - **Phase 5 — Structure & reach:** TOC (#13), then `.docx`/Google Docs export (#16).
