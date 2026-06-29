@@ -5,7 +5,16 @@
 
 const STORE_KEY = "margin.notes";
 const CAPTURE_ID = "margin_capture_selection";
-const openPanels = new Map(); // windowId -> Port
+const OPEN_KEY = "margin.openWindows"; // chrome.storage.session: windowIds with the panel open (survives worker sleep)
+const openPanels = new Map(); // windowId -> Port (in-memory mirror; the panel reconnects to keep this warm)
+
+// Rehydrate the open-state map when the worker cold-starts. The live port is lost on a
+// restart, so these entries carry a null port and fall back to a broadcast close.
+chrome.storage.session.get(OPEN_KEY).then((d) => {
+  const arr = d && d[OPEN_KEY];
+  if (Array.isArray(arr)) arr.forEach((wid) => { if (!openPanels.has(wid)) openPanels.set(wid, null); });
+}).catch(() => {});
+function persistOpen() { try { chrome.storage.session.set({ [OPEN_KEY]: [...openPanels.keys()] }); } catch (e) {} }
 
 /* ---------- helpers (mirrored in sidepanel.js) ---------- */
 function hostOf(url) { try { return new URL(url).hostname.replace(/^www\./, "") || null; } catch { return null; } }
@@ -65,13 +74,25 @@ chrome.runtime.onConnect.addListener((port) => {
   if (!m) return;
   const wid = Number(m[1]);
   openPanels.set(wid, port);
-  port.onDisconnect.addListener(() => { if (openPanels.get(wid) === port) openPanels.delete(wid); });
+  persistOpen();
+  port.onMessage.addListener(() => {}); // panel pings keep the port (and worker) warm while open
+  port.onDisconnect.addListener(() => {
+    // Only clear when this exact port dies. If the worker is being torn down the panel
+    // reconnects and re-registers, so the map stays accurate while a panel is open.
+    if (openPanels.get(wid) === port) { openPanels.delete(wid); persistOpen(); }
+  });
 });
+// The toggle decision must stay synchronous so sidePanel.open() keeps its user-gesture token:
+// read the in-memory map (kept warm by the panel's reconnect), never await storage before open().
 function toggle(windowId) {
   if (windowId == null) return;
-  const port = openPanels.get(windowId);
-  if (port) { try { port.postMessage({ type: "close" }); } catch (e) {} }
-  else chrome.sidePanel.open({ windowId }).catch(() => {});
+  if (openPanels.has(windowId)) {
+    const port = openPanels.get(windowId);
+    if (port) { try { port.postMessage({ type: "close" }); } catch (e) {} }
+    else { try { chrome.runtime.sendMessage({ type: "closePanel", windowId }); } catch (e) {} } // rehydrated entry: no live port
+  } else {
+    chrome.sidePanel.open({ windowId }).catch(() => {});
+  }
 }
 chrome.action.onClicked.addListener((tab) => toggle(tab && tab.windowId));
 chrome.commands.onCommand.addListener((command, tab) => { if (command === "toggle_margin") toggle(tab && tab.windowId); });

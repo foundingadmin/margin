@@ -785,8 +785,28 @@ function exportNote() {
   setTimeout(() => URL.revokeObjectURL(url), 1000); $("note-menu").hidden = true;
 }
 
-/* ---------- close-port ---------- */
-(async () => { try { const win = await chrome.windows.getCurrent(); const port = chrome.runtime.connect({ name: "panel:" + win.id }); port.onMessage.addListener((m) => { if (m && m.type === "close") window.close(); }); } catch (e) {} })();
+/* ---------- close-port ----------
+   The worker tracks "is this window's panel open?" via this port. MV3 workers sleep and
+   wipe that map, so we reconnect whenever the port drops (re-announcing open=true to the
+   freshly-woken worker) and ping periodically to keep it warm — this is what makes the
+   toggle shortcut deterministic instead of sporadic. A broadcast "closePanel" covers the
+   case where the worker restarted cold and only has a rehydrated, port-less entry. */
+(async () => {
+  let win;
+  try { win = await chrome.windows.getCurrent(); } catch (e) { return; }
+  const wid = win.id;
+  let port = null;
+  const connect = () => {
+    try {
+      port = chrome.runtime.connect({ name: "panel:" + wid });
+      port.onMessage.addListener((m) => { if (m && m.type === "close") window.close(); });
+      port.onDisconnect.addListener(() => { port = null; setTimeout(connect, 200); });
+    } catch (e) { port = null; }
+  };
+  connect();
+  setInterval(() => { try { if (port) port.postMessage({ type: "ping" }); else connect(); } catch (e) {} }, 20000);
+  chrome.runtime.onMessage.addListener((m) => { if (m && m.type === "closePanel" && m.windowId === wid) window.close(); });
+})();
 
 /* ---------- boot ---------- */
 async function init() {
