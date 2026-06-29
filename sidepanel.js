@@ -67,7 +67,7 @@ function autoTitle(host, tag, d = new Date()) {
 
 /* ---------- sanitizer (whitelist; preserves block markup, blocks scripts) ---------- */
 const ALLOWED_TAGS = new Set(["P","BR","DIV","SPAN","H1","H2","H3","H4","BLOCKQUOTE","PRE","CODE","UL","OL","LI","B","STRONG","I","EM","U","S","STRIKE","A","HR","IMG","DETAILS","SUMMARY","TABLE","THEAD","TBODY","TR","TD","TH","FONT"]);
-const ALLOWED_CLASSES = new Set(["callout","callout-blue","callout-green","callout-yellow","callout-red","callout-gray","callout-body","checklist","checked","check","badge","toggle","toggle-body","link-card","loading","lc-body","lc-title","lc-desc","lc-host","lc-image","src"]);
+const ALLOWED_CLASSES = new Set(["callout","callout-blue","callout-green","callout-yellow","callout-red","callout-gray","callout-body","checklist","checked","check","badge","toggle","toggle-body","link-card","loading","lc-body","lc-title","lc-desc","lc-host","lc-image","src","prov"]);
 const STYLE_PROPS = new Set(["color","background-color","font-weight","font-style","text-decoration","text-decoration-line","margin-left"]);
 const BLOCKLIST = "script,style,iframe,object,embed,link,meta,base,form,input,button,svg,math,template,noscript";
 function cleanStyle(value) {
@@ -92,6 +92,11 @@ function cleanAttrs(el) {
     else if ((n === "colspan" || n === "rowspan") && (tag === "TD" || tag === "TH")) keep = /^\d+$/.test(v);
     else if (n === "open" && tag === "DETAILS") keep = true;
     else if (n === "data-count" && tag === "UL") keep = /^\d+\/\d+$/.test(v);
+    // Paste-from-page provenance (#5/#6): the source URL + host of a pasted block, and the
+    // full-URL tooltip. Kept only when the value is a real web URL so a tag can't smuggle other data.
+    else if (n === "data-src") keep = /^https?:/i.test(v.trim());
+    else if (n === "data-srchost") keep = !!el.getAttribute("data-src");
+    else if (n === "title") keep = !!el.getAttribute("data-src");
     else if (n === "contenteditable") keep = v === "false";
     if (!keep) el.removeAttribute(a.name);
   });
@@ -231,8 +236,10 @@ function openNote(id) {
   editor.innerHTML = sanitizeHtml(n.html || "");
   updateChecklistCounts();
   editor.classList.toggle("numbered", !!n.numbered);
+  editor.classList.toggle("show-prov", !!n.showProv);
   $("mn-label").textContent = n.numbered ? "Hide Margin Numbers" : "Show Margin Numbers";
   $("pin-label").textContent = n.pinned ? "Unpin note" : "Pin note";
+  syncProvMenuItem();
   $("note-menu").hidden = true;
   setStatus("Saved"); updateCounts(); syncToolbar();
   showEditor();
@@ -276,6 +283,22 @@ function toggleMarginNumbers() {
   n.numbered = !n.numbered; n.updatedAt = now();
   editor.classList.toggle("numbered", n.numbered);
   $("mn-label").textContent = n.numbered ? "Hide Margin Numbers" : "Show Margin Numbers";
+  saveNotes(); $("note-menu").hidden = true;
+}
+// Paste provenance (#6): the "Show paste sources" toggle only makes sense when the note actually
+// holds pasted-from-page blocks, so show/hide the menu item by whether any data-src exists.
+function noteHasProv(n) { return !!n && /\sdata-src=/.test(n.html || ""); }
+function syncProvMenuItem() {
+  const n = activeNote();
+  const item = $("prov-item"); if (!item) return;
+  item.hidden = !noteHasProv(n);
+  $("prov-label").textContent = (n && n.showProv) ? "Hide paste sources" : "Show paste sources";
+}
+function toggleProvenance() {
+  const n = activeNote(); if (!n) return;
+  n.showProv = !n.showProv; n.updatedAt = now();
+  editor.classList.toggle("show-prov", n.showProv);
+  $("prov-label").textContent = n.showProv ? "Hide paste sources" : "Show paste sources";
   saveNotes(); $("note-menu").hidden = true;
 }
 // Absolute "Jun 29, 2026 · 3:04 PM" stamp for the Note info panel (relTime gives the fuzzy half).
@@ -739,13 +762,20 @@ function captureTargetNote(cap) {
 async function consumePendingCapture() {
   let cap;
   try { const d = await chrome.storage.session.get("margin.pendingCapture"); cap = d["margin.pendingCapture"]; } catch (e) { return false; }
-  if (!cap || !cap.html) return false;
+  if (!cap) return false;
   await chrome.storage.session.remove("margin.pendingCapture");
   if (now() - (cap.at || 0) > 15000) return false; // stale (e.g. browser restarted) — drop it
+  if (cap.empty) { // paste-from-page (#5) fired with nothing selected (or an unreadable page)
+    setStatus("No selection on the page"); setTimeout(() => setStatus("Saved"), 1600); return false;
+  }
+  if (!cap.html) return false;
 
+  // paste-from-page (#5) always lands in the note you're looking at; right-click capture obeys the
+  // lock (locked -> the open/last note; unlocked -> resolve by the captured page).
+  const paste = cap.mode === "paste";
   const locked = !state.settings.follow; // locked = the note stays put regardless of tab
-  let target = locked ? (activeNote() || (lastActiveId && state.notes.find((n) => n.id === lastActiveId)) || null) : null;
-  if (!target) target = captureTargetNote(cap); // unlocked, or nothing open: resolve by the capture's page
+  let target = (paste || locked) ? (activeNote() || (lastActiveId && state.notes.find((n) => n.id === lastActiveId)) || null) : null;
+  if (!target) target = captureTargetNote(cap); // unlocked capture, or nothing open: resolve by the capture's page
   if (!target) return false;
   target.ephemeral = false;
   addSource(target, cap.url); // union the captured page into the note's provenance/association set
@@ -755,7 +785,7 @@ async function consumePendingCapture() {
     editor.focus();
     if (!restoreCaptureCaret()) caretIntoEnd(editor);
     document.execCommand("insertHTML", false, sanitizeHtml(cap.html));
-    updateChecklistCounts(); queueSave();
+    updateChecklistCounts(); queueSave(); syncProvMenuItem();
   } else {
     target.html = (target.html && target.html.trim() ? target.html : "") + cap.html;
     target.updatedAt = now();
@@ -829,6 +859,7 @@ const GUIDE_HTML = `
 <li>Indent / outdent — <kbd>Tab</kbd> / <kbd>⇧Tab</kbd> in a list, or <kbd>⌘/Ctrl + ]</kbd> / <kbd>[</kbd> anywhere</li>
 <li>Link selected text — <kbd>⌘/Ctrl + K</kbd></li>
 <li>New note — <kbd>⌘/Ctrl + Enter</kbd> · Save now — <kbd>⌘/Ctrl + S</kbd></li>
+<li>Paste page selection into the open note — <kbd>⌘/Ctrl + Shift + Y</kbd></li>
 </ul>
 <h2>The lock &amp; page notes</h2>
 <p>The <strong>lock</strong> (top-right) controls whether the note tracks your tabs:</p>
@@ -839,12 +870,18 @@ const GUIDE_HTML = `
 <p>Notes are matched <strong>per page</strong>, so each Claude chat or Google Doc keeps its own. Empty notes are never saved, so this stays clutter-free. New notes auto-title as <code>Site · Page · Jun 28 3:30a</code>.</p>
 <p>A note remembers <strong>every page it's drawn from</strong> — its sources. Capture from another page into a note and that page joins the note's set; unlocked, the note then surfaces on <em>any</em> of those pages. The exact source URLs are kept (for provenance) but stay out of the way until you ask for them — open <strong>Note info</strong> in the note ⋯ menu to see them, along with when the note was created and last updated.</p>
 <p>Right-click any selection on a page → <strong>Save selection to Margin</strong> drops it as a sourced quote into that page's note.</p>
+<p>Or select on a page and press <kbd>⌘/Ctrl + Shift + Y</kbd> — <strong>paste-from-page</strong> drops that selection straight into the note you're <em>currently</em> looking at, at your cursor, tagged with the page it came from. Because it reads the live page, the source is certain (free-form ⌘V pastes aren't tagged — the browser can't tell where copied text came from). Open <strong>Show paste sources</strong> in the note ⋯ menu to reveal a faint <em>from ‹site›</em> under each pasted block; the full URL is on hover.</p>
 <h2>Organising notes</h2>
 <p>On the all-notes list, hit <strong>Select</strong> to multi-pick. From there you can <strong>Delete</strong> in bulk, or <strong>Merge</strong> two or more into one — bodies stack newest-on-top with a divider, and each chunk is headed by its original title so you can tell the pieces apart. The newest note's title becomes the merged note's, and every page the notes came from is pooled into its sources. A merge can be <strong>undone</strong> from the toast that appears.</p>
 <h2>Privacy</h2>
 <p>Notes live locally via <code>chrome.storage.local</code> and never leave your machine. Broad host access exists only so link cards can fetch a URL's preview; no scripts run on pages.</p>
 `;
 const CHANGELOG_HTML = `
+<div class="ver"><span class="ver-tag">v0.10.0</span><span class="ver-date">Jun 29, 2026</span></div>
+<ul>
+<li><strong>Paste-from-page</strong> — select text on any page and hit <kbd>⌘/Ctrl + Shift + Y</kbd> to drop it into the note you're <strong>currently viewing</strong>, right at your cursor, tagged with the page it came from. Unlike right-click capture (which makes a quote), this is a plain paste — and because it reads the live page, the source is <strong>certain</strong>.</li>
+<li><strong>Paste sources, on demand</strong> — a new <strong>Show paste sources</strong> toggle in the note ⋯ menu reveals a faint <em>from ‹site›</em> beneath each pasted block (full URL on hover), so you can see at a glance what you wrote versus what you borrowed. Off by default; the note reads clean until you ask.</li>
+</ul>
 <div class="ver"><span class="ver-tag">v0.9.0</span><span class="ver-date">Jun 29, 2026</span></div>
 <ul>
 <li><strong>Note info</strong> — the note ⋯ menu gains <strong>Note info</strong>: a panel showing every <strong>source URL</strong> the note was drawn from (click to open), plus when it was <strong>created</strong> and last <strong>updated</strong>. The full URLs were always stored — this is where you see them. Older notes show the page path they carried over with.</li>
@@ -986,7 +1023,7 @@ function bind() {
   const openAppMenu = (e) => { e.stopPropagation(); closeAllPopovers(); $("note-menu").hidden = true; $("app-menu").hidden = !$("app-menu").hidden; };
   $("app-menu-btn").addEventListener("click", openAppMenu);
   $("app-menu-btn-2").addEventListener("click", openAppMenu);
-  $("note-menu-btn").addEventListener("click", (e) => { e.stopPropagation(); closeAllPopovers(); $("app-menu").hidden = true; $("note-menu").hidden = !$("note-menu").hidden; });
+  $("note-menu-btn").addEventListener("click", (e) => { e.stopPropagation(); closeAllPopovers(); $("app-menu").hidden = true; syncProvMenuItem(); $("note-menu").hidden = !$("note-menu").hidden; });
   $("back").addEventListener("click", () => { const n = activeNote(); if (n) openNote(n.id); else ensureForActiveTab(); });
   $("info-back").addEventListener("click", () => { const n = activeNote(); if (n) openNote(n.id); else ensureForActiveTab(); });
   document.querySelectorAll("#info-seg .seg-btn").forEach((b) => b.addEventListener("click", () => { infoMode = b.dataset.tab; renderInfo(); }));
@@ -997,7 +1034,7 @@ function bind() {
 
   $("note-menu").addEventListener("click", (e) => {
     const btn = e.target.closest("button"); if (!btn) return; $("note-menu").hidden = true;
-    ({ copy: copyNote, export: exportNote, pin: togglePin, mnumbers: toggleMarginNumbers, info: showNoteInfo, delete: deleteNote }[btn.dataset.act] || (() => {}))();
+    ({ copy: copyNote, export: exportNote, pin: togglePin, mnumbers: toggleMarginNumbers, prov: toggleProvenance, info: showNoteInfo, delete: deleteNote }[btn.dataset.act] || (() => {}))();
   });
   $("app-menu").addEventListener("click", (e) => {
     const btn = e.target.closest("button"); if (!btn) return; $("app-menu").hidden = true;

@@ -23,6 +23,10 @@ The *second* thing these dumps reveal: the **editor itself is maturing** — lis
 - **Default theme — dark.** The side panel opens in dark mode by default.
 - **"Badge," never "highlight."** Highlight as a concept is retired; the term and the tool are *badge* everywhere.
 
+### ✅ Shipped in v0.10.0 (Phase 3 — Provenance & capture)
+
+The differentiator cluster landed as a pair. **Paste-from-page (#5)** — a rebindable hotkey (`⌘/Ctrl+Shift+Y`) reads the active tab's live selection (`scripting` permission), opens the panel, and drops it into the note you're *currently viewing* at the caret, unioning that page into the note's `sources[]`. **Provenance display (#6)** — pasted blocks carry `data-src`/`data-srchost`; a per-note **Show paste sources** toggle reveals a faint *from ‹host›* under each, full URL on hover, off by default. **Decision locked:** only the *certain* source is tagged — free-form `⌘V` is left unmarked rather than guessed, so every `data-src` is trustworthy. (B4/B5 were already handled in the panel capture path that #5 reuses.)
+
 ### ✅ Shipped in v0.9.0 (Phase 2 — Note info)
 
 **Note info (#2)** landed, closing out Phase 2. The note ⋯ menu now carries **Note info** → a panel that reads straight off the `sources[]` model: every **source URL** the note was drawn from (full provenance URLs, click to open in a new tab), plus **created** and **updated** stamps (absolute, with a relative "x ago" on updated). Pre-`sources[]` notes only ever stored a page path, so that's what they surface. The Phase 2 arc (sources[] → Merge → Note info) is complete; the only remaining Theme-1 slice is bulk **pin** (#1).
@@ -63,15 +67,9 @@ Nav/UX overhaul landed: **blue icon** (one mid-tone glyph legible on every surfa
 - **Fix direction:** add a click handler that opens note links in a new tab (or make the citation line `contenteditable="false"`), and lift the link styling so it reads as a link.
 - **Lift:** S.
 
-**B4. Locked note is ignored when sending from a webpage**
-- **Symptom:** with a note **LOCKED**, "Add to Margin" from the page's right-click menu still drops content into the *tab's* note, not the note you're actually looking at.
-- **Fix direction:** the panel should publish its current open-note id + locked state to storage; on capture, if locked, the background appends to *that* note instead of resolving by tab. (This is the locked-semantics promise applied to capture.)
-- **Lift:** M.
+**B4. Locked note is ignored when sending from a webpage** — ✅ **resolved.** Capture moved panel-side: the panel owns note targeting, so a LOCKED note now keeps the capture (it appends to the open/last note, not the tab's note). Paste-from-page (#5) reuses this path. *(Was: M.)*
 
-**B5. Sent content always lands at the end**
-- **Want:** inserted at the **last known caret position** in the note, not appended.
-- **Fix direction:** track and persist the note's last selection range; insert there on capture.
-- **Lift:** M. *(Pairs with B4 — same capture path.)*
+**B5. Sent content always lands at the end** — ✅ **resolved.** The panel tracks the note's last caret range and inserts the capture there, not at the end. Same capture path as B4. *(Was: M.)*
 
 ---
 
@@ -89,11 +87,11 @@ Nav/UX overhaul landed: **blue icon** (one mid-tone glyph legible on every surfa
 
 ## Theme — Capture & provenance *(the differentiator)*
 
-**5. Paste-from-page hotkey** — a key command that pulls the active tab's live selection into the **currently open** note. Needs the `scripting` permission (we hold `<all_urls>`). Distinct from right-click capture: respects the note you're viewing, and tags the paste with a *certain* source URL. **Lift:** M.
+**5. Paste-from-page hotkey** — ✅ **shipped v0.10.0.** `⌘/Ctrl+Shift+Y` (rebindable) reads the active tab's live selection via `scripting`, opens the panel, and inserts it into the **currently open** note at the caret, unioning the page into `sources[]`. A plain paste (not a blockquote+citation), tagged with a *certain* source URL. **Lift:** M.
 
-**6. Paste provenance — show/hide which paragraphs came from the web** — tag pasted blocks with origin URL; a toggle reveals a subtle "from \<source\>" treatment, traceable to the URL. **Watch:** the browser can't reveal the true copy source; best signal is the active tab URL at paste time (right for #5, a guess for free-form paste). The spine of the research-surface thesis. **Lift:** M.
+**6. Paste provenance — show/hide which paragraphs came from the web** — ✅ **shipped v0.10.0.** Paste-from-page blocks carry `data-src`/`data-srchost`; a per-note **Show paste sources** toggle reveals a subtle "from ‹host›" under each (full URL on hover), off by default. **Resolved watch-item:** rather than guess the source of free-form `⌘V` pastes, only the *certain* path (#5) is tagged — every `data-src` is trustworthy. **Lift:** M.
 
-*(B3/B4/B5 above are correctness work in this same cluster.)*
+*(B3 remains; B4/B5 were already resolved in the panel capture path #5 reuses.)*
 
 ---
 
@@ -170,7 +168,7 @@ Nav/UX overhaul landed: **blue icon** (one mid-tone glyph legible on every surfa
 - **Phase 0 — Squash the bugs (B1–B5).** Correctness first; most are S–M and several (B2/B4/B5) fold into features you're building anyway.
 - **Phase 1 — Editor wins that don't need new data:** ✅ **shipped in v0.6.0** — Margin Numbers (#7), Lists (#8), Text size (#10), Selection count (#11), Title hover (#18), Default dark (#17). *(Contextual title #19 and the nav/icon work shipped in v0.5.0.)*
 - **Phase 2 — The `sources[]` model (#4) → Merge (#3) → Note info (#2).** ✅ #4 shipped v0.7.0; ✅ Merge (#3) shipped v0.8.0; ✅ Note info (#2) shipped v0.9.0 — Phase 2 complete. **Remaining Theme-1 slice:** bulk **pin** (#1). **Next theme: Phase 3 — Provenance & capture** (Paste-from-page #5 + provenance display #6, shipped as a pair; B4/B5 fold into the same capture path).
-- **Phase 3 — Provenance & capture:** Paste-from-page (#5) + provenance display (#6). Same plumbing; ship as a pair.
+- **Phase 3 — Provenance & capture:** ✅ **shipped v0.10.0** — Paste-from-page (#5) + provenance display (#6), as a pair. Free-form-paste tagging deliberately skipped (unreliable source).
 - **Phase 4 — Rich media:** Images (#14) → filetypes (#15). Media before TOC since they're more-used.
 - **Phase 5 — Structure & reach:** TOC (#13), then `.docx`/Google Docs export (#16).
 - **Decide first:** Selection toolbar (#9 — resolved to badge; just confirm placement). Spell-check is scrapped; icon polarity is solved.

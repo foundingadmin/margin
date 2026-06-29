@@ -62,7 +62,39 @@ function toggle(windowId) {
   }
 }
 chrome.action.onClicked.addListener((tab) => toggle(tab && tab.windowId));
-chrome.commands.onCommand.addListener((command, tab) => { if (command === "toggle_margin") toggle(tab && tab.windowId); });
+chrome.commands.onCommand.addListener((command, tab) => {
+  if (command === "toggle_margin") return toggle(tab && tab.windowId);
+  if (command === "paste_from_page") return pasteFromPage(tab);
+});
+
+/* ---------- paste-from-page (#5) ----------
+   A hotkey that pulls the active tab's *live* selection into the currently open note. Unlike
+   right-click capture (which makes a visible blockquote + citation), this drops the selection
+   as a plain paragraph tagged with provenance (data-src) — a *certain* source, since we read it
+   straight off the page the user is on. The panel inserts it into the open note at the caret. */
+async function pasteFromPage(tab) {
+  if (!tab || tab.id == null) return;
+  if (tab.windowId != null) chrome.sidePanel.open({ windowId: tab.windowId }).catch(() => {}); // sync: keep the gesture
+  let sel = "";
+  try {
+    const [res] = await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      func: () => { try { return String(window.getSelection() || ""); } catch (e) { return ""; } }
+    });
+    sel = (res && res.result) || "";
+  } catch (e) { sel = ""; } // restricted page (chrome://, web store, PDF viewer) — no access
+  const text = sel.replace(/ /g, " ").trim();
+  const url = tab.url || "", host = hostOf(url), pk = pageKeyOf(url);
+  if (!text) {
+    // Nothing selected (or unreadable page): tell the panel so it can show a gentle hint, not insert.
+    chrome.storage.session.set({ "margin.pendingCapture": { at: Date.now(), mode: "paste", empty: true } });
+    return;
+  }
+  const inner = text.split(/\r?\n/).map((l) => escapeHtml(l)).join("<br>");
+  const tag = host ? ` data-src="${escapeHtml(url)}" data-srchost="${escapeHtml(host)}" title="${escapeHtml(url)}"` : "";
+  const html = `<p class="prov"${tag}>${inner}</p>`;
+  chrome.storage.session.set({ "margin.pendingCapture": { at: Date.now(), mode: "paste", html, url, host: host || null, pageKey: pk || null, title: tab.title || "" } });
+}
 
 /* ---------- selection capture ----------
    The panel owns note targeting now: it knows the open note, the lock state, and the live

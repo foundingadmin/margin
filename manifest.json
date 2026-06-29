@@ -1,13 +1,14 @@
 {
   "manifest_version": 3,
   "name": "Margin \u00b7 Side notes for the web",
-  "version": "0.9.0",
+  "version": "0.10.0",
   "description": "A fast, tab-aware notepad in your Chrome side panel. Rich blocks, slash menu, page-linked notes, one-key toggle.",
   "permissions": [
     "storage",
     "sidePanel",
     "tabs",
     "contextMenus",
+    "scripting",
     "unlimitedStorage"
   ],
   "host_permissions": [
@@ -41,6 +42,13 @@
         "mac": "Command+Shift+E"
       },
       "description": "Open or close Margin"
+    },
+    "paste_from_page": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+Y",
+        "mac": "Command+Shift+Y"
+      },
+      "description": "Paste the page's selection into the open note (with source)"
     }
   }
 }
