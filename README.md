@@ -8,6 +8,18 @@ A fast, tab-aware notepad that lives in your Chrome side panel. Now a real block
 3. **Load unpacked** → pick the folder. (Updating from a previous version? Just hit the reload ↻ on the Margin card.)
 4. Open it with the toolbar icon or **⌘/Ctrl+Shift+E**.
 
+## Stay in sync with `main` (dev)
+Want to track the repo instead of re-downloading a zip? Chrome can't load an unpacked extension straight from GitHub, but this gets you one-click-close:
+
+1. **First time**, clone the repo into your apps folder:
+   ```sh
+   git clone https://github.com/foundingadmin/margin.git "$HOME/Custom Apps/margin"
+   ```
+   Then **Load unpacked** → pick that `margin` folder.
+2. **After any merge to `main`**, double-click **`update-margin.command`** in the folder (it pulls the latest and pops open `chrome://extensions`), then hit the reload ↻ on the Margin card.
+
+The script clones if the folder is missing and fast-forwards to `main` if it's there, so the same file bootstraps and updates. Override the location with `MARGIN_DIR=…` if you keep it elsewhere. (macOS may ask you to confirm the first run of a `.command` file — right-click → **Open** once.)
+
 ## Set your own keyboard shortcut
 The ⋯ menu → **Set keyboard shortcut…** opens `chrome://extensions/shortcuts`. Click the row for **Open or close Margin**, press your combo (Chrome requires Ctrl/Alt/⌘ in it), and flip the dropdown to **Global** if you want it to fire even when Chrome isn't focused.
 
