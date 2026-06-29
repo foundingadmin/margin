@@ -23,6 +23,10 @@ The *second* thing these dumps reveal: the **editor itself is maturing** — lis
 - **Default theme — dark.** The side panel opens in dark mode by default.
 - **"Badge," never "highlight."** Highlight as a concept is retired; the term and the tool are *badge* everywhere.
 
+### ✅ Shipped in v0.7.0 (Phase 2 keystone — the `sources[]` model)
+
+The one real fork landed: **a note's identity is now a *set* of pages, not a single URL** (#4). Each note carries `sources[]` — full URLs for provenance, normalized page keys for matching. A note surfaces on *any* of its source pages when unlocked, and **capture unions** the captured page into the set. Legacy notes migrate on first load. This unblocks the rest of Phase 2 — **Merge (#3)** unions two notes' sets, **Note info (#2)** displays them.
+
 ### ✅ Shipped in v0.6.0 (Phase 1 — editor wins, no new data)
 
 Six low-dependency editor items landed: **Margin Numbers** (#7 — per-note gutter numbering, legal/hierarchical, with the subtle alternating row tint), **Text size** (#10 — Small/Regular/Large/Supersize, persisted, scales the whole note), **Selection word count** (#11 — live in the footer), **Lists & indenting** (#8 — `⌘/Ctrl+]`/`[` indent/outdent for lists *and* plain text, extra line-space; Tab/Shift-Tab already shipped with B2), **Rename affordance** (#18 — pencil + tint on title hover), and **Default dark** (#17). Items #7, #8, #10, #11, #17, #18 are therefore done.
@@ -71,7 +75,7 @@ Nav/UX overhaul landed: **blue icon** (one mid-tone glyph legible on every surfa
 
 **3. Merge notes — newest content on top** — concatenate selected notes by `updatedAt` desc; union their source URLs. **Watch:** which title survives, separator between bodies, delete-vs-keep originals, an undo path. **Lift:** M.
 
-**4. Multi-URL association — one note across many pages when unlocked** *(the keystone / the one real fork)* — a note's `pageKey` becomes a `sources[]` set of full URLs. That set does double duty: the **provenance trail** *and* the **association set** (where the note surfaces unlocked). Stored-data change + migration; redefines a note from one-page to set-of-pages. Build first; merge consumes it. **Lift:** M.
+**4. Multi-URL association — one note across many pages when unlocked** *(the keystone / the one real fork)* — ✅ **shipped v0.7.0.** A note's `pageKey` became a `sources[]` set: each entry holds the **full URL** (the provenance trail, rarely shown) keyed by normalized page (origin + path) for matching (the association set — where the note surfaces unlocked). A note matches the current page if *any* source matches; **capture unions** the captured page into the note's set, so one note can span every page it borrowed from. Legacy notes migrate automatically on first load. Merge (#3) and Note info (#2) consume this model. **Lift:** M.
 
 ---
 
@@ -157,7 +161,7 @@ Nav/UX overhaul landed: **blue icon** (one mid-tone glyph legible on every surfa
 
 - **Phase 0 — Squash the bugs (B1–B5).** Correctness first; most are S–M and several (B2/B4/B5) fold into features you're building anyway.
 - **Phase 1 — Editor wins that don't need new data:** ✅ **shipped in v0.6.0** — Margin Numbers (#7), Lists (#8), Text size (#10), Selection count (#11), Title hover (#18), Default dark (#17). *(Contextual title #19 and the nav/icon work shipped in v0.5.0.)*
-- **Phase 2 — The `sources[]` model (#4) → Merge (#3) → Note info (#2).** The keystone unlocks the whole management/provenance cluster.
+- **Phase 2 — The `sources[]` model (#4) → Merge (#3) → Note info (#2).** ✅ #4 shipped in v0.7.0 — the keystone is in. **Next up: Merge (#3)**, then Note info (#2).
 - **Phase 3 — Provenance & capture:** Paste-from-page (#5) + provenance display (#6). Same plumbing; ship as a pair.
 - **Phase 4 — Rich media:** Images (#14) → filetypes (#15). Media before TOC since they're more-used.
 - **Phase 5 — Structure & reach:** TOC (#13), then `.docx`/Google Docs export (#16).
@@ -165,9 +169,9 @@ Nav/UX overhaul landed: **blue icon** (one mid-tone glyph legible on every surfa
 
 ---
 
-## The one real fork
+## The one real fork — ✅ taken (v0.7.0)
 
-**A note's identity becomes a set, not a single URL** (#4). One `pageKey` → a `sources[]` set of full URLs. Clean evolution of page-granular matching, but a stored-data change with a migration — and the entire merge / association / provenance cluster hangs off it. Still the single structural decision on the board.
+**A note's identity is now a set, not a single URL** (#4). One `pageKey` → a `sources[]` set: full URLs for provenance, normalized page keys for matching. The stored-data change shipped with an automatic migration. The merge / association / provenance cluster now hangs off a foundation that exists — no structural decisions left open on the board.
 
 ---
 

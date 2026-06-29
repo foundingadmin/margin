@@ -117,6 +117,9 @@ async function load() {
   const data = await chrome.storage.local.get([STORE_KEY, SETTINGS_KEY]);
   state.notes = Array.isArray(data[STORE_KEY]) ? data[STORE_KEY] : [];
   if (data[SETTINGS_KEY]) state.settings = { ...state.settings, ...data[SETTINGS_KEY] };
+  let migrated = false;
+  state.notes.forEach((n) => { if (migrateNote(n)) migrated = true; });
+  if (migrated) await saveNotes();
 }
 async function saveNotes() { await chrome.storage.local.set({ [STORE_KEY]: state.notes }); }
 async function saveSettings() { await chrome.storage.local.set({ [SETTINGS_KEY]: state.settings }); }
@@ -150,12 +153,50 @@ function applyLockIcon() {
   b.setAttribute("aria-label", following ? "Unlocked: note follows tabs" : "Locked: note stays put");
 }
 
+/* ---------- sources (a note's identity is a set of pages, not one) ----------
+   Every note carries `sources: [{ url, key, host, at }]`. `url` is the *full* URL it was
+   drawn from (the provenance trail, rarely shown); `key` is the normalized page key
+   (origin+path, query/hash dropped) used for matching (the association set — where the
+   note surfaces unlocked). Merge unions these sets; capture appends to them. */
+function sourceFrom(url) {
+  const u = url || "";
+  const key = pageKeyOf(u), host = hostOf(u);
+  if (!key && !host) return null; // unparseable / non-web (e.g. about:blank) — a source-less scratch note
+  return { url: u, key, host, at: now() };
+}
+function sourcesFor(url) { const s = sourceFrom(url); return s ? [s] : []; }
+function noteHost(n) { const s = (n.sources || []).find((x) => x.host); return s ? s.host : (n.host || null); }
+// Union a page into a note's source set: dedup by key (or host for non-web), upgrading a
+// migrated key-only entry to a full URL when we now have one, and bumping its recency.
+function addSource(n, url) {
+  if (!Array.isArray(n.sources)) n.sources = [];
+  const s = sourceFrom(url); if (!s) return;
+  const hit = n.sources.find((x) => s.key ? x.key === s.key : (!x.key && x.host === s.host));
+  if (hit) { if (s.url && s.url.length > (hit.url || "").length) hit.url = s.url; hit.at = s.at; }
+  else n.sources.push(s);
+}
+// One-time, idempotent: lift legacy {pageKey, host} notes into the sources[] model. Pre-change
+// notes never stored the full URL, so the page key is the best `url` we can show.
+function migrateNote(n) {
+  if (Array.isArray(n.sources)) return false;
+  const key = n.pageKey || null, host = n.host || null;
+  n.sources = (key || host) ? [{ url: key || "", key, host, at: n.createdAt || now() }] : [];
+  delete n.pageKey; delete n.host;
+  return true;
+}
+
 /* ---------- note model ---------- */
-function noteMatchesContext(n) { return state.pageKey ? n.pageKey === state.pageKey : (n.host === state.host && !n.pageKey); }
+function noteMatchesContext(n) {
+  const src = n.sources || [];
+  if (state.pageKey) return src.some((s) => s.key === state.pageKey);
+  if (state.host) return src.some((s) => !s.key && s.host === state.host);
+  return src.length === 0; // non-web context (chrome://, blank): the source-less scratch notes
+}
 function latestContextNote() { return state.notes.filter(noteMatchesContext).sort((a, b) => b.updatedAt - a.updatedAt)[0] || null; }
 function createContextualNote(host, ephemeral) {
   const title = autoTitle(host, pageTag(state.tabInfo));
-  const n = { id: uid(), title, autoTitle: title, html: "", host: host || null, pageKey: state.pageKey || null, pinned: false, ephemeral: !!ephemeral, createdAt: now(), updatedAt: now() };
+  const sources = sourcesFor(state.tabInfo && state.tabInfo.url);
+  const n = { id: uid(), title, autoTitle: title, html: "", sources, pinned: false, ephemeral: !!ephemeral, createdAt: now(), updatedAt: now() };
   state.notes.unshift(n); return n;
 }
 function noteIsEmpty(n) { return n ? htmlToText(n.html).trim() === "" && (n.title || "") === (n.autoTitle || "") : false; }
@@ -521,7 +562,7 @@ function renderList() {
   for (const n of ns) {
     const li = elc("li", "note-row" + (sel ? " selectable" : "") + (sel && state.selected.has(n.id) ? " sel" : ""));
     const snip = htmlToText(n.html).trim().slice(0, 120) || "Empty note";
-    const chip = n.host ? `<span class="host-chip">${n.host}</span>` : "";
+    const nh = noteHost(n); const chip = nh ? `<span class="host-chip">${nh}</span>` : "";
     const check = sel ? '<span class="row-check" aria-hidden="true"></span>' : "";
     li.innerHTML = `${check}<div class="row-main"><div class="row-top"><span class="row-title"></span>${n.pinned ? '<span class="row-pin">★</span>' : ""}</div><div class="row-snip"></div><div class="row-foot">${chip}<span class="row-time">${relTime(n.updatedAt)}</span></div></div>`;
     li.querySelector(".row-title").textContent = n.title || "Untitled";
@@ -582,10 +623,10 @@ function restoreCaptureCaret() {
 // Resolve (or create) the note for a capture's own page — mirrors the old worker logic, panel-side.
 function captureTargetNote(cap) {
   const pk = cap.pageKey, host = cap.host;
-  let n = state.notes.filter((x) => pk ? x.pageKey === pk : (x.host === host && !x.pageKey)).sort((a, b) => b.updatedAt - a.updatedAt)[0];
+  let n = state.notes.filter((x) => (x.sources || []).some((s) => pk ? s.key === pk : (!s.key && s.host === host))).sort((a, b) => b.updatedAt - a.updatedAt)[0];
   if (!n) {
     const title = autoTitle(host, pageTag({ url: cap.url, title: cap.title }));
-    n = { id: uid(), title, autoTitle: title, html: "", host: host || null, pageKey: pk || null, pinned: false, ephemeral: false, createdAt: now(), updatedAt: now() };
+    n = { id: uid(), title, autoTitle: title, html: "", sources: sourcesFor(cap.url), pinned: false, ephemeral: false, createdAt: now(), updatedAt: now() };
     state.notes.unshift(n);
   }
   return n;
@@ -602,6 +643,7 @@ async function consumePendingCapture() {
   if (!target) target = captureTargetNote(cap); // unlocked, or nothing open: resolve by the capture's page
   if (!target) return false;
   target.ephemeral = false;
+  addSource(target, cap.url); // union the captured page into the note's provenance/association set
 
   if (state.activeId === target.id && isEditorView()) {
     // Inserting into the note you're looking at — drop it at the last caret, not the end (B5).
@@ -690,11 +732,18 @@ const GUIDE_HTML = `
 <li><strong>🔓 Unlocked</strong> — the panel follows the active tab, surfacing that page's note as you move.</li>
 </ul>
 <p>Notes are matched <strong>per page</strong>, so each Claude chat or Google Doc keeps its own. Empty notes are never saved, so this stays clutter-free. New notes auto-title as <code>Site · Page · Jun 28 3:30a</code>.</p>
+<p>A note remembers <strong>every page it's drawn from</strong> — its sources. Capture from another page into a note and that page joins the note's set; unlocked, the note then surfaces on <em>any</em> of those pages. The exact source URLs are kept (for provenance) but stay out of the way until you ask for them.</p>
 <p>Right-click any selection on a page → <strong>Save selection to Margin</strong> drops it as a sourced quote into that page's note.</p>
 <h2>Privacy</h2>
 <p>Notes live locally via <code>chrome.storage.local</code> and never leave your machine. Broad host access exists only so link cards can fetch a URL's preview; no scripts run on pages.</p>
 `;
 const CHANGELOG_HTML = `
+<div class="ver"><span class="ver-tag">v0.7.0</span><span class="ver-date">Jun 29, 2026</span></div>
+<ul>
+<li><strong>A note is a set of pages now</strong> — every note remembers the <strong>full URL(s)</strong> it was drawn from (its provenance), matched per page so it still surfaces where you'd expect. Your existing notes carry over automatically.</li>
+<li><strong>Capture spans pages</strong> — saving a selection into a locked note records that page on the note, so one note can gather from many pages. Unlocked, it'll surface on any of them.</li>
+<li><em>Groundwork for merging notes and a per-note info panel (URLs · created · updated), both landing next.</em></li>
+</ul>
 <div class="ver"><span class="ver-tag">v0.6.0</span><span class="ver-date">Jun 29, 2026</span></div>
 <ul>
 <li><strong>Margin Numbers</strong> — a per-note toggle (note ⋯ menu) that numbers each block down a faint left gutter, legal-style: top-level blocks <code>1, 2, 3</code>, and list items / table rows as <code>12.1, 12.2</code>. A whisper-quiet alternating row tint shows each number's span. Positional only — it renumbers live.</li>
