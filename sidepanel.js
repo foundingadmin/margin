@@ -208,7 +208,7 @@ function activate(view) { ["view-editor", "view-browser", "view-info"].forEach((
 function showEditor() { activate("view-editor"); }
 async function showBrowser() {
   pruneIfEmpty(state.activeId); await saveNotes();
-  closeAllPopovers();
+  closeAllPopovers(); hideToast();
   activate("view-browser");
   state.query = ""; $("search").value = "";
   state.selectMode = false; state.selected.clear();
@@ -224,6 +224,7 @@ function activeNote() { return state.notes.find((x) => x.id === state.activeId);
 function ensureCssMode() { if (!cssModeSet) { try { document.execCommand("styleWithCSS", false, true); } catch (e) {} cssModeSet = true; } }
 function openNote(id) {
   const n = state.notes.find((x) => x.id === id); if (!n) return;
+  hideToast();
   state.activeId = id; lastActiveId = id;
   try { chrome.storage.session.set({ "margin.activeId": id }); } catch (e) {}
   $("title").value = n.title || "";
@@ -584,6 +585,7 @@ function updateBulkBar() {
   const n = state.selected.size;
   $("bulk-count").textContent = n + " selected";
   $("bulk-delete").disabled = n === 0;
+  $("bulk-merge").disabled = n < 2; // merge needs at least two notes to pool
   const all = (state.visibleIds || []).length > 0 && (state.visibleIds || []).every((id) => state.selected.has(id));
   $("bulk-all").textContent = all ? "Clear all" : "Select all";
 }
@@ -605,6 +607,52 @@ async function bulkDelete() {
   state.notes = state.notes.filter((x) => !state.selected.has(x.id));
   await saveNotes();
   setSelectMode(false);
+}
+// Pool a source object into an array, deduping by key (or host for non-web) and keeping the
+// most specific URL — the array-level twin of addSource(), used when merging existing notes.
+function unionSourceInto(arr, s) {
+  const hit = arr.find((x) => s.key ? x.key === s.key : (!x.key && x.host === s.host));
+  if (hit) { if ((s.url || "").length > (hit.url || "").length) hit.url = s.url; }
+  else arr.push({ url: s.url || "", key: s.key || null, host: s.host || null, at: s.at || now() });
+}
+// Merge (#3): concatenate selected notes newest-first, union their source sets into one note.
+async function bulkMerge() {
+  const picked = state.notes.filter((n) => state.selected.has(n.id));
+  if (picked.length < 2) return;
+  const ordered = picked.slice().sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0)); // newest content on top
+  // Each section keeps its original title as an inline heading above its contents, so the
+  // merged note shows where each chunk came from; the newest title still becomes the note's own.
+  const esc = (s) => String(s).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+  const body = ordered.map((n) => `<h2>${esc(n.title || "Untitled")}</h2>` + ((n.html && n.html.trim()) ? n.html : "")).join("<hr>");
+  const sources = [];
+  ordered.forEach((n) => (n.sources || []).forEach((s) => unionSourceInto(sources, s)));
+  const newest = ordered[0]; // the newest note's title survives (its content leads)
+  const merged = {
+    id: uid(), title: newest.title || "Untitled", autoTitle: newest.autoTitle || newest.title || "",
+    html: sanitizeHtml(body), sources,
+    pinned: ordered.some((n) => n.pinned), numbered: !!newest.numbered, ephemeral: false,
+    createdAt: Math.min(...ordered.map((n) => n.createdAt || now())), updatedAt: now()
+  };
+  const snapshot = state.notes.slice(); // originals are untouched objects — undo just restores the array
+  const ids = new Set(picked.map((n) => n.id));
+  state.notes = [merged, ...state.notes.filter((n) => !ids.has(n.id))];
+  await saveNotes();
+  setSelectMode(false);
+  showToast(`Merged ${picked.length} notes into “${merged.title}”`, async () => {
+    state.notes = snapshot; await saveNotes(); if (!isEditorView()) renderList();
+  });
+}
+
+/* ---------- transient undo toast ---------- */
+let toastTimer = null;
+function hideToast() { clearTimeout(toastTimer); toastTimer = null; const t = $("toast"); if (t) t.hidden = true; }
+function showToast(msg, onUndo) {
+  const t = $("toast"); if (!t) return;
+  $("toast-msg").textContent = msg;
+  const undo = $("toast-undo"); undo.hidden = !onUndo;
+  undo.onclick = onUndo ? () => { hideToast(); onUndo(); } : null;
+  t.hidden = false;
+  clearTimeout(toastTimer); toastTimer = setTimeout(hideToast, 7000);
 }
 
 /* ---------- tab context + follow ---------- */
@@ -734,10 +782,17 @@ const GUIDE_HTML = `
 <p>Notes are matched <strong>per page</strong>, so each Claude chat or Google Doc keeps its own. Empty notes are never saved, so this stays clutter-free. New notes auto-title as <code>Site · Page · Jun 28 3:30a</code>.</p>
 <p>A note remembers <strong>every page it's drawn from</strong> — its sources. Capture from another page into a note and that page joins the note's set; unlocked, the note then surfaces on <em>any</em> of those pages. The exact source URLs are kept (for provenance) but stay out of the way until you ask for them.</p>
 <p>Right-click any selection on a page → <strong>Save selection to Margin</strong> drops it as a sourced quote into that page's note.</p>
+<h2>Organising notes</h2>
+<p>On the all-notes list, hit <strong>Select</strong> to multi-pick. From there you can <strong>Delete</strong> in bulk, or <strong>Merge</strong> two or more into one — bodies stack newest-on-top with a divider, and each chunk is headed by its original title so you can tell the pieces apart. The newest note's title becomes the merged note's, and every page the notes came from is pooled into its sources. A merge can be <strong>undone</strong> from the toast that appears.</p>
 <h2>Privacy</h2>
 <p>Notes live locally via <code>chrome.storage.local</code> and never leave your machine. Broad host access exists only so link cards can fetch a URL's preview; no scripts run on pages.</p>
 `;
 const CHANGELOG_HTML = `
+<div class="ver"><span class="ver-tag">v0.8.0</span><span class="ver-date">Jun 29, 2026</span></div>
+<ul>
+<li><strong>Merge notes</strong> — in <strong>Select</strong> mode on the all-notes list, choose two or more and hit <strong>Merge</strong>. They become one note: bodies <strong>newest on top</strong> with a divider between, each chunk <strong>headed by its original title</strong> so you can see where it came from. The newest note's title becomes the merged note's own, and every page they came from is pooled into one set.</li>
+<li><strong>Undo</strong> — a merge pops a toast with <strong>Undo</strong> for a few seconds, so it's safe to try; one click puts the originals back.</li>
+</ul>
 <div class="ver"><span class="ver-tag">v0.7.0</span><span class="ver-date">Jun 29, 2026</span></div>
 <ul>
 <li><strong>A note is a set of pages now</strong> — every note remembers the <strong>full URL(s)</strong> it was drawn from (its provenance), matched per page so it still surfaces where you'd expect. Your existing notes carry over automatically.</li>
@@ -924,6 +979,7 @@ function bind() {
   $("search").addEventListener("input", (e) => { state.query = e.target.value; renderList(); });
   $("select-toggle").addEventListener("click", () => setSelectMode(!state.selectMode));
   $("bulk-all").addEventListener("click", bulkSelectAll);
+  $("bulk-merge").addEventListener("click", bulkMerge);
   $("bulk-delete").addEventListener("click", bulkDelete);
 
   document.addEventListener("selectionchange", () => { if (document.activeElement === editor) { syncToolbar(); saveCaptureCaret(); updateCounts(); } });

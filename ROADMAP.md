@@ -23,6 +23,10 @@ The *second* thing these dumps reveal: the **editor itself is maturing** — lis
 - **Default theme — dark.** The side panel opens in dark mode by default.
 - **"Badge," never "highlight."** Highlight as a concept is retired; the term and the tool are *badge* everywhere.
 
+### ✅ Shipped in v0.8.0 (Phase 2 — Merge)
+
+**Merge notes (#3)** landed on top of the `sources[]` model: in the all-notes Select mode, pick 2+ notes → **Merge** folds them into one — bodies **newest-on-top** with a divider, each section **headed by its original title**, the **newest title** becoming the merged note's own, **source sets unioned** (pinned if any were; created-date the oldest). A **toast with Undo** replaces a confirm dialog. This is also the second slice of multiselect management (#1), joining bulk delete. Next in Phase 2: **Note info (#2)**.
+
 ### ✅ Shipped in v0.7.0 (Phase 2 keystone — the `sources[]` model)
 
 The one real fork landed: **a note's identity is now a *set* of pages, not a single URL** (#4). Each note carries `sources[]` — full URLs for provenance, normalized page keys for matching. A note surfaces on *any* of its source pages when unlocked, and **capture unions** the captured page into the set. Legacy notes migrate on first load. This unblocks the rest of Phase 2 — **Merge (#3)** unions two notes' sets, **Note info (#2)** displays them.
@@ -69,11 +73,11 @@ Nav/UX overhaul landed: **blue icon** (one mid-tone glyph legible on every surfa
 
 ## Theme — Managing notes at scale
 
-**1. Multiselect note management** *(first slice shipped v0.4.3: bulk delete)* — extend the existing selection scaffold to merge and pin. **Lift:** S–M.
+**1. Multiselect note management** *(bulk delete shipped v0.4.3; merge shipped v0.8.0)* — selection scaffold now does delete + merge. Remaining slice: bulk **pin**. **Lift:** S.
 
 **2. Note info menu — associated URL(s), created, updated** — data already exists on every note. Full URL now stored (decided), shown on demand. **Lift:** S. *Pre-change notes have only the path to show.*
 
-**3. Merge notes — newest content on top** — concatenate selected notes by `updatedAt` desc; union their source URLs. **Watch:** which title survives, separator between bodies, delete-vs-keep originals, an undo path. **Lift:** M.
+**3. Merge notes — newest content on top** — ✅ **shipped v0.8.0.** Selected notes concatenate by `updatedAt` desc with an `<hr>` between bodies; each section is **headed by its original title** (inline `<h2>`) so the merged chunks stay legible; source sets union. Resolved watch-items: the **newest note's title** becomes the merged note's own, originals are **consumed** (replaced by the merged note) with a **toast Undo** instead of a confirm dialog. **Lift:** M.
 
 **4. Multi-URL association — one note across many pages when unlocked** *(the keystone / the one real fork)* — ✅ **shipped v0.7.0.** A note's `pageKey` became a `sources[]` set: each entry holds the **full URL** (the provenance trail, rarely shown) keyed by normalized page (origin + path) for matching (the association set — where the note surfaces unlocked). A note matches the current page if *any* source matches; **capture unions** the captured page into the note's set, so one note can span every page it borrowed from. Legacy notes migrate automatically on first load. Merge (#3) and Note info (#2) consume this model. **Lift:** M.
 
@@ -161,7 +165,7 @@ Nav/UX overhaul landed: **blue icon** (one mid-tone glyph legible on every surfa
 
 - **Phase 0 — Squash the bugs (B1–B5).** Correctness first; most are S–M and several (B2/B4/B5) fold into features you're building anyway.
 - **Phase 1 — Editor wins that don't need new data:** ✅ **shipped in v0.6.0** — Margin Numbers (#7), Lists (#8), Text size (#10), Selection count (#11), Title hover (#18), Default dark (#17). *(Contextual title #19 and the nav/icon work shipped in v0.5.0.)*
-- **Phase 2 — The `sources[]` model (#4) → Merge (#3) → Note info (#2).** ✅ #4 shipped in v0.7.0 — the keystone is in. **Next up: Merge (#3)**, then Note info (#2).
+- **Phase 2 — The `sources[]` model (#4) → Merge (#3) → Note info (#2).** ✅ #4 shipped v0.7.0; ✅ Merge (#3) shipped v0.8.0. **Next up: Note info (#2)** — surface a note's source URLs / created / updated. (Plus the small remaining multiselect slice: bulk **pin**, #1.)
 - **Phase 3 — Provenance & capture:** Paste-from-page (#5) + provenance display (#6). Same plumbing; ship as a pair.
 - **Phase 4 — Rich media:** Images (#14) → filetypes (#15). Media before TOC since they're more-used.
 - **Phase 5 — Structure & reach:** TOC (#13), then `.docx`/Google Docs export (#16).

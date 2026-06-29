@@ -1,5 +1,13 @@
 # Margin — version log
 
+## v0.8.0 — 2026-06-29
+
+Merge notes (Roadmap Phase 2, #3) — the second slice of multiselect management, built on the `sources[]` model.
+
+- **Merge (#3)** — in the all-notes **Select** mode, pick two or more notes and hit **Merge**. They fold into one: bodies stacked **newest-on-top** with a divider between each, every chunk **headed by its original title** so the pieces stay legible. The **newest note's title** becomes the merged note's own, and their **source sets union** (so the merged note surfaces on any of its pages when unlocked). Pinned if any original was; created-date is the oldest of the set.
+- **Undo** — merging shows a toast with **Undo** for a few seconds; one click restores the originals. No confirmation dialog — the undo path replaces it.
+- Extends the bulk-select scaffold (Select all / Clear all / Delete) from v0.4.3 with Merge alongside Delete.
+
 ## v0.7.0 — 2026-06-29
 
 The `sources[]` model (Roadmap Phase 2, #4) — the keystone. A note's identity stops being a single page and becomes a **set of pages**.
