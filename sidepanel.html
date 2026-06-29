@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Margin</title>
+  <link rel="stylesheet" href="sidepanel.css" />
+</head>
+<body>
+  <div id="app">
+
+    <!-- ===================== EDITOR (default) ===================== -->
+    <section id="view-editor" class="view is-active">
+      <header class="topbar">
+        <button id="open-browser" class="icon-btn" title="All notes (home)" aria-label="All notes"></button>
+        <button id="new-note" class="newbtn" title="New note (⌘/Ctrl+Enter)">+ New</button>
+        <div class="spacer"></div>
+        <button id="lock-toggle" class="pill-toggle" aria-label="Link note to this page"></button>
+        <button id="theme-toggle" class="pill-toggle" aria-label="Toggle dark mode"></button>
+        <button id="app-menu-btn" class="icon-btn" title="Settings" aria-label="Settings"></button>
+      </header>
+
+      <div class="title-row">
+        <input id="title" class="title-input" placeholder="Untitled" aria-label="Note title" />
+        <button id="note-menu-btn" class="icon-btn" title="Note actions" aria-label="Note actions">⋯</button>
+      </div>
+
+      <!-- note-level menu (kebab on title row) -->
+      <div id="note-menu" class="menu" hidden>
+        <button data-act="copy">Copy note text</button>
+        <button data-act="export">Download .html</button>
+        <button data-act="pin"><span id="pin-label">Pin note</span></button>
+        <div class="menu-sep"></div>
+        <button data-act="delete" class="danger">Delete note</button>
+      </div>
+
+      <div class="rt-toolbar" id="rt-toolbar">
+        <div class="style-dd">
+          <button id="style-trigger" class="style-trigger" title="Text style">
+            <span id="style-current">Body</span><span aria-hidden="true">▾</span>
+          </button>
+        </div>
+        <span class="divider"></span>
+        <button data-cmd="bold" title="Bold (⌘/Ctrl+B)"><b>B</b></button>
+        <button data-cmd="italic" title="Italic (⌘/Ctrl+I)"><i>I</i></button>
+        <button data-cmd="underline" title="Underline (⌘/Ctrl+U)"><u>U</u></button>
+        <button data-cmd="strikeThrough" title="Strikethrough"><s>S</s></button>
+        <button id="color-btn" title="Text color & badge"><span class="ic-badge" aria-hidden="true">A</span><span class="caret" aria-hidden="true">▾</span></button>
+        <span class="divider"></span>
+        <button data-cmd="insertUnorderedList" title="Bulleted list (⌘/Ctrl+Shift+8)">•</button>
+        <button data-cmd="insertOrderedList" title="Numbered list (⌘/Ctrl+Shift+7)">1.</button>
+        <button id="checklist-btn" title="Checklist (⌘/Ctrl+Shift+9)">☑</button>
+        <button data-cmd="createLink" title="Link (⌘/Ctrl+K)">↗</button>
+        <span class="divider"></span>
+        <button id="plus-btn" title="Insert block (/)">＋</button>
+        <button data-cmd="removeFormat" title="Clear formatting">⌫</button>
+      </div>
+
+      <div id="editor" class="editor" contenteditable="true" spellcheck="true" aria-label="Note body"></div>
+
+      <footer class="statusbar">
+        <span id="counts">0 words · 0 characters</span>
+        <span id="save-status" class="save-status">Saved</span>
+      </footer>
+
+      <!-- floating layers -->
+      <div id="style-menu" class="style-menu" hidden></div>
+      <div id="color-pop" class="popover" hidden></div>
+      <div id="slash" class="slash" hidden></div>
+      <input id="image-input" type="file" accept="image/*" hidden />
+    </section>
+
+    <!-- ===================== BROWSER (home) ===================== -->
+    <section id="view-browser" class="view">
+      <header class="topbar">
+        <button id="back" class="icon-btn back" aria-label="Back to note">‹</button>
+        <button id="new-note-2" class="newbtn" title="New note">+ New</button>
+        <div class="spacer"></div>
+        <button id="select-toggle" class="newbtn" title="Select notes">Select</button>
+        <button id="app-menu-btn-2" class="icon-btn" title="Settings" aria-label="Settings"></button>
+      </header>
+      <div class="filters"><input id="search" type="search" placeholder="Search notes…" autocomplete="off" /></div>
+      <div class="list-head">
+        <span id="list-title" class="list-title">All notes</span>
+        <label class="sort"><span>Sort</span>
+          <select id="sort-select" aria-label="Sort notes">
+            <option value="updated">Last updated</option>
+            <option value="created">Date created</option>
+            <option value="title">Title A–Z</option>
+          </select>
+        </label>
+      </div>
+      <ul id="note-list" class="note-list"></ul>
+      <div id="empty" class="empty" hidden>
+        <p class="empty-title">No notes yet</p>
+        <p class="empty-sub">Hit <em>+ New</em>, or highlight text on any page and choose
+          <em>“Save selection to Margin.”</em></p>
+      </div>
+      <footer id="bulk-bar" class="bulk-bar" hidden>
+        <button id="bulk-all" class="bulk-link">Select all</button>
+        <span id="bulk-count" class="bulk-count">0 selected</span>
+        <button id="bulk-delete" class="bulk-del" disabled>Delete</button>
+      </footer>
+    </section>
+
+    <!-- ===================== INFO (guide · release notes · roadmap) ===================== -->
+    <section id="view-info" class="view">
+      <header class="topbar">
+        <button id="info-back" class="icon-btn back" aria-label="Back to note">‹</button>
+        <span id="info-title" class="list-title">User guide</span>
+      </header>
+      <div class="seg" id="info-seg" hidden>
+        <button data-tab="changelog" class="seg-btn is-on">Release notes</button>
+        <button data-tab="roadmap" class="seg-btn">Roadmap</button>
+      </div>
+      <div id="info-body" class="info-body"></div>
+    </section>
+
+    <!-- app-level menu (gear) — root level so it overlays any view -->
+    <div id="app-menu" class="menu app-menu" hidden>
+      <button data-act="guide">User guide</button>
+      <button data-act="changelog">Release notes</button>
+      <button data-act="roadmap">Roadmap</button>
+      <div class="menu-sep"></div>
+      <button data-act="shortcut">Set keyboard shortcut…</button>
+    </div>
+
+  </div>
+  <script src="sidepanel.js"></script>
+</body>
+</html>
