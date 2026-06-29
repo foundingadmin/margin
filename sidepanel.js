@@ -10,7 +10,7 @@ let captureCaretRange = null; // last caret position inside the editor (for capt
 let lastActiveId = null;      // id of the most recently opened note (for locked capture when reopened — B4)
 
 let state = {
-  notes: [], settings: { theme: "light", follow: false, sort: "updated" }, host: null, pageKey: null, tabInfo: null, activeId: null, query: "", selectMode: false, selected: new Set()
+  notes: [], settings: { theme: "dark", follow: false, sort: "updated", textSize: "regular" }, host: null, pageKey: null, tabInfo: null, activeId: null, query: "", selectMode: false, selected: new Set()
 };
 
 /* ---------- tiny dom utils ---------- */
@@ -68,7 +68,7 @@ function autoTitle(host, tag, d = new Date()) {
 /* ---------- sanitizer (whitelist; preserves block markup, blocks scripts) ---------- */
 const ALLOWED_TAGS = new Set(["P","BR","DIV","SPAN","H1","H2","H3","H4","BLOCKQUOTE","PRE","CODE","UL","OL","LI","B","STRONG","I","EM","U","S","STRIKE","A","HR","IMG","DETAILS","SUMMARY","TABLE","THEAD","TBODY","TR","TD","TH","FONT"]);
 const ALLOWED_CLASSES = new Set(["callout","callout-blue","callout-green","callout-yellow","callout-red","callout-gray","callout-body","checklist","checked","check","badge","toggle","toggle-body","link-card","loading","lc-body","lc-title","lc-desc","lc-host","lc-image","src"]);
-const STYLE_PROPS = new Set(["color","background-color","font-weight","font-style","text-decoration","text-decoration-line"]);
+const STYLE_PROPS = new Set(["color","background-color","font-weight","font-style","text-decoration","text-decoration-line","margin-left"]);
 const BLOCKLIST = "script,style,iframe,object,embed,link,meta,base,form,input,button,svg,math,template,noscript";
 function cleanStyle(value) {
   return (value || "").split(";").map((s) => s.trim()).filter(Boolean).filter((decl) => {
@@ -188,6 +188,8 @@ function openNote(id) {
   $("title").value = n.title || "";
   editor.innerHTML = sanitizeHtml(n.html || "");
   updateChecklistCounts();
+  editor.classList.toggle("numbered", !!n.numbered);
+  $("mn-label").textContent = n.numbered ? "Hide Margin Numbers" : "Show Margin Numbers";
   $("pin-label").textContent = n.pinned ? "Unpin note" : "Pin note";
   $("note-menu").hidden = true;
   setStatus("Saved"); updateCounts(); syncToolbar();
@@ -197,7 +199,14 @@ function updateCounts() {
   const text = editor.innerText || "";
   const words = (text.trim().match(/\S+/g) || []).length;
   const chars = text.replace(/\u200B/g, "").replace(/\n$/, "").length;
-  $("counts").textContent = `${words} ${words === 1 ? "word" : "words"} · ${chars} ${chars === 1 ? "character" : "characters"}`;
+  let out = `${words} ${words === 1 ? "word" : "words"} · ${chars} ${chars === 1 ? "character" : "characters"}`;
+  const sel = window.getSelection();
+  if (sel && sel.rangeCount && !sel.isCollapsed && editor.contains(sel.anchorNode) && editor.contains(sel.focusNode)) {
+    const str = sel.toString();
+    const selChars = str.length;
+    if (selChars > 0) { const selWords = (str.trim().match(/\S+/g) || []).length; out += `  ·  ${selWords} ${selWords === 1 ? "word" : "words"} selected`; }
+  }
+  $("counts").textContent = out;
 }
 function queueSave() {
   const n = activeNote(); if (!n) return;
@@ -220,6 +229,13 @@ async function deleteNote() {
   state.notes = state.notes.filter((x) => x.id !== n.id); await saveNotes(); await ensureForActiveTab();
 }
 function togglePin() { const n = activeNote(); if (!n) return; n.pinned = !n.pinned; n.updatedAt = now(); $("pin-label").textContent = n.pinned ? "Unpin note" : "Pin note"; saveNotes(); $("note-menu").hidden = true; }
+function toggleMarginNumbers() {
+  const n = activeNote(); if (!n) return;
+  n.numbered = !n.numbered; n.updatedAt = now();
+  editor.classList.toggle("numbered", n.numbered);
+  $("mn-label").textContent = n.numbered ? "Hide Margin Numbers" : "Show Margin Numbers";
+  saveNotes(); $("note-menu").hidden = true;
+}
 
 /* ---------- range / block helpers ---------- */
 function focusEditor() { editor.focus(); ensureCssMode(); }
@@ -292,6 +308,23 @@ function syncToolbar() {
     setStyleLabel(block);
     $("style-menu").querySelectorAll("button").forEach((b) => b.classList.toggle("sel", b.dataset.tag === block));
   } catch (e) {}
+}
+
+/* ---------- text size (accessibility; persisted, whole-note scale) ---------- */
+const SIZES = [["small","Small"],["regular","Regular"],["large","Large"],["supersize","Supersize"]];
+function applyTextSize() {
+  const sz = SIZES.some(([k]) => k === state.settings.textSize) ? state.settings.textSize : "regular";
+  SIZES.forEach(([k]) => editor.classList.toggle("size-" + k, k === sz));
+  const lbl = (SIZES.find(([k]) => k === sz) || SIZES[1])[1];
+  const cur = $("size-current"); if (cur) cur.textContent = lbl;
+  $("size-menu").querySelectorAll("button").forEach((b) => b.classList.toggle("sel", b.dataset.size === sz));
+}
+function buildSizeMenu() {
+  const m = $("size-menu"); m.innerHTML = "";
+  SIZES.forEach(([k, label]) => { const b = elc("button"); b.dataset.size = k; b.textContent = label; b.addEventListener("click", () => setTextSize(k)); m.appendChild(b); });
+}
+function setTextSize(k) {
+  state.settings.textSize = k; applyTextSize(); saveSettings(); $("size-menu").hidden = true;
 }
 
 /* ---------- checklist ---------- */
@@ -461,7 +494,7 @@ function buildPopovers() {
   BADGE_COLORS.forEach(([bg, fg]) => { const s = elc("div", "swatch"); s.style.background = bg; s.style.color = fg; s.textContent = "A"; s.style.display = "grid"; s.style.placeItems = "center"; s.style.fontWeight = "700"; s.style.fontSize = "12px"; s.addEventListener("mousedown", (e) => { e.preventDefault(); applyBadge(bg, fg); cp.hidden = true; }); g2.appendChild(s); });
   s2.appendChild(g2); cp.appendChild(s2);
 }
-function closeAllPopovers() { ["style-menu","color-pop"].forEach((id) => { $(id).hidden = true; }); }
+function closeAllPopovers() { ["style-menu","color-pop","size-menu"].forEach((id) => { $(id).hidden = true; }); }
 function openPopover(popId, anchor) {
   closeAllPopovers();
   const pop = $(popId); pop.hidden = false;
@@ -609,6 +642,12 @@ function onKeydown(e) {
       return;
     }
   }
+  // ⌘]/⌘[ — indent / outdent (works on lists and plain text alike).
+  if (inEditor && meta && !e.shiftKey && !e.altKey && (e.code === "BracketRight" || e.code === "BracketLeft")) {
+    e.preventDefault(); focusEditor();
+    document.execCommand(e.code === "BracketRight" ? "indent" : "outdent");
+    queueSave(); syncToolbar(); return;
+  }
   if (inEditor && e.altKey && meta && /^Digit[0-3]$/.test(e.code)) { e.preventDefault(); applyStyle({ Digit0: "P", Digit1: "H1", Digit2: "H2", Digit3: "H3" }[e.code]); return; }
   if (inEditor && meta && e.shiftKey && e.code === "Digit8") { e.preventDefault(); return exec("insertUnorderedList"); }
   if (inEditor && meta && e.shiftKey && e.code === "Digit7") { e.preventDefault(); return exec("insertOrderedList"); }
@@ -630,13 +669,17 @@ const GUIDE_HTML = `
 <ul>
 <li>The <strong>style menu</strong> previews each option in its real style.</li>
 <li><strong>B / I / U / S</strong>, text color, and a ClickUp-style <strong>badge</strong> (select text → pick a color).</li>
+<li><strong>Text size</strong> — the sizer beside the style menu (Small / Regular / Large / Supersize) scales the whole note evenly. It's a sticky setting, not per-selection formatting.</li>
 <li><strong>Checklist</strong>: hollow circles with a live count at the top; click a circle to check it — the line goes muted and struck through.</li>
 </ul>
+<h2>Margin Numbers</h2>
+<p>From a note's <strong>⋯</strong> menu, switch on <strong>Margin Numbers</strong> to number every block down a faint left gutter — top-level blocks <code>1, 2, 3</code>, with list items and table rows as <code>12.1, 12.2</code>. They're a live positional reference, not a permanent ID, so they renumber as you write. Per-note, off by default.</p>
 <h2>Keyboard (mirrors Google Docs)</h2>
 <ul>
 <li>Title / Heading / Subheading — <kbd>⌥⌘ / Alt+Ctrl + 1 / 2 / 3</kbd></li>
 <li>Body text — <kbd>⌥⌘ / Alt+Ctrl + 0</kbd></li>
 <li>Bulleted / numbered / checklist — <kbd>⌘/Ctrl + Shift + 8 / 7 / 9</kbd></li>
+<li>Indent / outdent — <kbd>Tab</kbd> / <kbd>⇧Tab</kbd> in a list, or <kbd>⌘/Ctrl + ]</kbd> / <kbd>[</kbd> anywhere</li>
 <li>Link selected text — <kbd>⌘/Ctrl + K</kbd></li>
 <li>New note — <kbd>⌘/Ctrl + Enter</kbd> · Save now — <kbd>⌘/Ctrl + S</kbd></li>
 </ul>
@@ -652,6 +695,15 @@ const GUIDE_HTML = `
 <p>Notes live locally via <code>chrome.storage.local</code> and never leave your machine. Broad host access exists only so link cards can fetch a URL's preview; no scripts run on pages.</p>
 `;
 const CHANGELOG_HTML = `
+<div class="ver"><span class="ver-tag">v0.6.0</span><span class="ver-date">Jun 29, 2026</span></div>
+<ul>
+<li><strong>Margin Numbers</strong> — a per-note toggle (note ⋯ menu) that numbers each block down a faint left gutter, legal-style: top-level blocks <code>1, 2, 3</code>, and list items / table rows as <code>12.1, 12.2</code>. A whisper-quiet alternating row tint shows each number's span. Positional only — it renumbers live.</li>
+<li><strong>Text size</strong> — a sizer in the toolbar (Small / Regular / Large / Supersize) scales a whole note evenly. It's a setting, so it sticks across notes — accessibility, not formatting.</li>
+<li><strong>Selection count</strong> — the footer now shows the live word count of whatever you've selected, beside the note total.</li>
+<li><strong>Lists & indenting</strong> — <kbd>⌘/Ctrl + ]</kbd> and <kbd>[</kbd> indent / outdent lists (and plain paragraphs); a little more breathing room between items.</li>
+<li><strong>Rename affordance</strong> — hovering a note's title eases in a pencil and tints the text, signalling "click to rename."</li>
+<li><strong>Dark by default</strong> — the panel now opens in dark mode on first run.</li>
+</ul>
 <div class="ver"><span class="ver-tag">v0.5.0</span><span class="ver-date">Jun 29, 2026</span></div>
 <ul>
 <li><strong>Navigation overhaul</strong> — a <strong>home</strong> icon opens your notes (a hamburger implied a menu); <strong>+ New</strong> now holds the same position on every view so it never jumps.</li>
@@ -760,7 +812,7 @@ function openInfo(mode) {
 /* ---------- wiring ---------- */
 function bind() {
   editor = $("editor");
-  buildStyleMenu(); buildPopovers();
+  buildStyleMenu(); buildPopovers(); buildSizeMenu(); applyTextSize();
 
   $("open-browser").innerHTML = ICON.home;
   $("app-menu-btn").innerHTML = ICON.gear;
@@ -780,7 +832,7 @@ function bind() {
 
   $("note-menu").addEventListener("click", (e) => {
     const btn = e.target.closest("button"); if (!btn) return; $("note-menu").hidden = true;
-    ({ copy: copyNote, export: exportNote, pin: togglePin, delete: deleteNote }[btn.dataset.act] || (() => {}))();
+    ({ copy: copyNote, export: exportNote, pin: togglePin, mnumbers: toggleMarginNumbers, delete: deleteNote }[btn.dataset.act] || (() => {}))();
   });
   $("app-menu").addEventListener("click", (e) => {
     const btn = e.target.closest("button"); if (!btn) return; $("app-menu").hidden = true;
@@ -788,6 +840,7 @@ function bind() {
   });
   $("sort-select").addEventListener("change", (e) => { state.settings.sort = e.target.value; saveSettings(); renderList(); });
 
+  $("title-edit").addEventListener("click", () => { const t = $("title"); t.focus(); t.select(); });
   $("title").addEventListener("input", queueSave);
   editor.addEventListener("input", () => { updateChecklistCounts(); queueSave(); checkSlash(); });
   editor.addEventListener("focus", ensureCssMode);
@@ -810,6 +863,7 @@ function bind() {
 
   // style dropdown
   $("style-trigger").addEventListener("click", (e) => { e.stopPropagation(); const open = $("style-menu").hidden; closeAllPopovers(); if (open) { $("style-menu").hidden = false; syncToolbar(); } });
+  $("size-trigger").addEventListener("click", (e) => { e.stopPropagation(); const open = $("size-menu").hidden; closeAllPopovers(); if (open) { applyTextSize(); openPopover("size-menu", $("size-trigger")); } });
   // toolbar commands
   document.querySelectorAll('.rt-toolbar [data-cmd]').forEach((b) => b.addEventListener("click", () => exec(b.dataset.cmd)));
   $("checklist-btn").addEventListener("click", makeChecklist);
@@ -823,7 +877,7 @@ function bind() {
   $("bulk-all").addEventListener("click", bulkSelectAll);
   $("bulk-delete").addEventListener("click", bulkDelete);
 
-  document.addEventListener("selectionchange", () => { if (document.activeElement === editor) { syncToolbar(); saveCaptureCaret(); } });
+  document.addEventListener("selectionchange", () => { if (document.activeElement === editor) { syncToolbar(); saveCaptureCaret(); updateCounts(); } });
   document.addEventListener("keydown", onKeydown);
 
   document.addEventListener("click", (e) => {
@@ -833,7 +887,7 @@ function bind() {
     if (!$("note-menu").hidden && !$("note-menu").contains(e.target) && !onNote) $("note-menu").hidden = true;
     if (!$("slash").hidden && !$("slash").contains(e.target)) hideSlash();
     const inBar = e.target.closest && e.target.closest(".rt-toolbar");
-    if (!inBar) ["style-menu","color-pop"].forEach((id) => { const p = $(id); if (!p.hidden && !p.contains(e.target)) p.hidden = true; });
+    if (!inBar) ["style-menu","color-pop","size-menu"].forEach((id) => { const p = $(id); if (!p.hidden && !p.contains(e.target)) p.hidden = true; });
   });
 
   chrome.storage.onChanged.addListener((changes, area) => {

@@ -23,6 +23,10 @@ The *second* thing these dumps reveal: the **editor itself is maturing** — lis
 - **Default theme — dark.** The side panel opens in dark mode by default.
 - **"Badge," never "highlight."** Highlight as a concept is retired; the term and the tool are *badge* everywhere.
 
+### ✅ Shipped in v0.6.0 (Phase 1 — editor wins, no new data)
+
+Six low-dependency editor items landed: **Margin Numbers** (#7 — per-note gutter numbering, legal/hierarchical, with the subtle alternating row tint), **Text size** (#10 — Small/Regular/Large/Supersize, persisted, scales the whole note), **Selection word count** (#11 — live in the footer), **Lists & indenting** (#8 — `⌘/Ctrl+]`/`[` indent/outdent for lists *and* plain text, extra line-space; Tab/Shift-Tab already shipped with B2), **Rename affordance** (#18 — pencil + tint on title hover), and **Default dark** (#17). Items #7, #8, #10, #11, #17, #18 are therefore done.
+
 ### ✅ Shipped in v0.5.0 (no longer on the board)
 
 Nav/UX overhaul landed: **blue icon** (one mid-tone glyph legible on every surface — retired the tile and the runtime light/dark swap), **home/house icon** for the notes list, **+ New pinned to a consistent position** across views, **settings gear** holding app-level items (guide / release notes / roadmap / shortcut), **note-actions menu** moved to the title row (copy / download / pin / delete), **combined text-color + badge tool** (one static square-A icon, two-section menu), **note-browser sorting** (last updated / created / title, persisted), **contextual in-app title** (resolves the double-title), **in-app roadmap** (split: User guide on its own page; Release notes + Roadmap tabbed), and **default shortcut → ⌘⇧E**. Items #19 and #20 below are therefore done; #12 is scrapped.
@@ -83,25 +87,25 @@ Nav/UX overhaul landed: **blue icon** (one mid-tone glyph legible on every surfa
 
 ## Theme — The text editor
 
-**7. Margin Numbers** *(name locked)* — a note-wide toggle that numbers each block down a **faint, code-editor-style left gutter**.
+**7. Margin Numbers** *(name locked)* — ✅ **shipped v0.6.0.** A per-note toggle (in the note ⋯ menu) that numbers each block down a **faint, code-editor-style left gutter**.
 - **Format:** hierarchical/legal — top-level blocks get `1, 2, 3…`; nested units (list items, table rows) get `12.1, 12.2, 12.3`. *This is why your "bullets get their own number" worry dissolves: the gutter + the `12.x` sub-numbering keep them visually and semantically separate from a list's own ordinals.*
 - **Gutter solves the double-number problem:** a separate dim left column physically removes Margin Numbers from the content's own numbers. Placement *is* the disambiguation.
 - **On-state signal:** the faint gutter appearing *is* the "it's on" cue — no extra chrome. Plus a **very subtle alternating row tint** so each number's span (start→end) reads at a glance.
 - **Scope:** strictly an *immediate* reference aid (positional, renumbers live). Not a permanent ID.
 - **Touches:** a CSS counter on the editor's blocks + a per-note (or global setting?) toggle. **Lift:** S–M — the note is already a block sequence, so no `<pre>`/line restructuring.
 
-**8. Lists** — make list editing behave.
-- Tab / Shift-Tab → indent / outdent + correct marker (fixes **B2**).
-- `⌘]` indent in; `⌘[` indent out, or strip list styling at top level. These also indent **non-list** text.
-- A list applied to **H1/H2/H3** text inherits that text's size, color, highlight, weight.
-- Subtle extra line-space between items.
+**8. Lists** — ✅ **shipped v0.6.0.** Make list editing behave.
+- Tab / Shift-Tab → indent / outdent + correct marker (fixes **B2**). *(shipped)*
+- `⌘]` indent in; `⌘[` indent out — also indent **non-list** text (now persisted: `margin-left` is whitelisted in the sanitizer). *(shipped)*
+- A list applied to **H1/H2/H3** text inherits that text's size, color, weight — headings inside `<li>` already render at heading scale via the editor's descendant rules. *(covered)*
+- Subtle extra line-space between items. *(shipped)*
 - **Lift:** M.
 
 **9. Selection toolbar — floating menu on selection** — select text in a note → minimal menu above it: style dropdown, text color, **badge**, add link, clear formatting. Visual match to the main toolbar (slightly tighter sizing OK). *(Resolved: the menu carries **badge** — consistent with the combined color/badge tool already shipped. No highlight returns.)* **Lift:** M.
 
-**10. Text size — accessibility, not formatting** — a dropdown after the style tool: Small / Regular / Large / Supersize. Scales *all* styles equally across the whole note. It's a **persisted setting** (sticks across notes), placed in the toolbar where people expect sizing to live. **Lift:** S–M.
+**10. Text size — accessibility, not formatting** — ✅ **shipped v0.6.0.** A dropdown after the style tool: Small / Regular / Large / Supersize. Scales *all* styles equally across the whole note (headings/badges are em-based, so scaling the editor's base size scales everything). A **persisted setting** (sticks across notes), in the toolbar where people expect sizing to live. **Lift:** S–M.
 
-**11. Selection word/char count** — show the selection's count next to the total in the footer. **Lift:** S.
+**11. Selection word/char count** — ✅ **shipped v0.6.0.** The footer shows the selection's live word count next to the note total. **Lift:** S.
 
 *(Was #12, one-click spell-check — **scrapped.** Chrome doesn't expose spellcheck suggestions to JS, and bundling a dictionary isn't worth the weight.)*
 
@@ -139,9 +143,9 @@ Nav/UX overhaul landed: **blue icon** (one mid-tone glyph legible on every surfa
 
 ## Theme — Platform & polish
 
-**17. Default to dark mode** — side panel opens dark. **Lift:** S.
+**17. Default to dark mode** — ✅ **shipped v0.6.0.** Side panel opens dark on first run (the `theme` setting defaults to `dark`; an explicit prior choice still wins). **Lift:** S.
 
-**18. Note-title hover affordance** *(ref: Loom)* — hovering the title animates an edit (pencil) icon in + a color shift, signaling "click to rename." No view/author chrome — just the affordance. **Lift:** S.
+**18. Note-title hover affordance** *(ref: Loom)* — ✅ **shipped v0.6.0.** Hovering the title eases in a pencil icon and shifts the title toward the accent, signaling "click to rename." Clicking the pencil focuses and selects the title. **Lift:** S.
 
 **19. Contextual in-app title** *(double-title fix)* — ✅ **shipped in v0.5.0.** The Chrome-drawn top header can't be touched, so the in-app title slot now carries a contextual page title ("All notes," "User guide," "Release notes & roadmap") instead of echoing the app name.
 
@@ -152,7 +156,7 @@ Nav/UX overhaul landed: **blue icon** (one mid-tone glyph legible on every surfa
 ## Suggested build order
 
 - **Phase 0 — Squash the bugs (B1–B5).** Correctness first; most are S–M and several (B2/B4/B5) fold into features you're building anyway.
-- **Phase 1 — Editor wins that don't need new data:** Margin Numbers (#7), Lists (#8), Text size (#10), Selection count (#11), Title hover (#18), Default dark (#17). High-visibility, low-dependency. *(Contextual title #19 and the nav/icon work already shipped in v0.5.0.)*
+- **Phase 1 — Editor wins that don't need new data:** ✅ **shipped in v0.6.0** — Margin Numbers (#7), Lists (#8), Text size (#10), Selection count (#11), Title hover (#18), Default dark (#17). *(Contextual title #19 and the nav/icon work shipped in v0.5.0.)*
 - **Phase 2 — The `sources[]` model (#4) → Merge (#3) → Note info (#2).** The keystone unlocks the whole management/provenance cluster.
 - **Phase 3 — Provenance & capture:** Paste-from-page (#5) + provenance display (#6). Same plumbing; ship as a pair.
 - **Phase 4 — Rich media:** Images (#14) → filetypes (#15). Media before TOC since they're more-used.

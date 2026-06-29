@@ -10,12 +10,14 @@
   --radius:10px; --radius-sm:7px;
   --ui:-apple-system,system-ui,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
   --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+  --mn-tint:rgba(20,24,31,.022);
 }
 .dark {
   --bg:#1c1d1f; --chrome:#232427; --surface-2:#2c2e31; --ink:#e9eaec;
   --muted:#a3a8af; --faint:#777c83; --border:#34363a;
   --accent:#6f9bff; --accent-soft:#27314a; --on-accent:#11151c;
   --danger:#ec6a5c; --shadow:0 10px 28px rgba(0,0,0,.45);
+  --mn-tint:rgba(255,255,255,.026);
 }
 * { box-sizing:border-box; }
 html,body { height:100%; margin:0; }
@@ -47,6 +49,12 @@ body { background:var(--bg); color:var(--ink); font-family:var(--ui); font-size:
 .title-input { appearance:none; border:0; background:transparent; color:var(--ink); font-family:var(--ui); font-size:19px; font-weight:680; letter-spacing:-.01em; padding:12px 16px 6px; width:100%; }
 .title-input:focus { outline:none; }
 .title-input::placeholder { color:var(--faint); }
+/* hover affordance: a pencil eases in + the title shifts toward accent, signalling "click to rename" */
+.title-edit { appearance:none; border:0; background:transparent; color:var(--faint); flex:0 0 auto; width:26px; height:26px; border-radius:var(--radius-sm); display:grid; place-items:center; cursor:pointer; opacity:0; transform:translateX(-4px); transition:opacity .15s ease, transform .15s ease, color .15s ease, background .12s ease; }
+.title-edit svg { width:15px; height:15px; }
+.title-edit:hover { background:var(--surface-2); color:var(--accent); }
+.title-row:hover .title-edit, .title-input:focus ~ .title-edit { opacity:1; transform:none; }
+.title-row:hover .title-input:not(:focus) { color:var(--accent); }
 
 /* ---------- rich toolbar ---------- */
 .rt-toolbar { display:flex; align-items:center; gap:2px; flex-wrap:wrap; padding:4px 10px 6px; border-bottom:1px solid var(--border); flex:0 0 auto; position:relative; }
@@ -72,6 +80,23 @@ body { background:var(--bg); color:var(--ink); font-family:var(--ui); font-size:
 .sd-quote { font-size:13.5px; color:var(--muted); border-left:3px solid var(--accent); padding-left:8px; }
 .sd-code { font-family:var(--mono); font-size:12.5px; background:var(--surface-2); padding:2px 6px; border-radius:5px; }
 
+/* text-size dropdown (accessibility scale) */
+.size-dd { position:relative; }
+.size-trigger { appearance:none; border:1px solid var(--border); background:var(--bg); color:var(--ink); height:27px; border-radius:6px; padding:0 7px; font-size:12.5px; font-family:var(--ui); cursor:pointer; display:inline-flex; align-items:center; gap:5px; }
+.size-trigger:hover { border-color:var(--muted); }
+.size-trigger .ic-size { font-weight:700; font-size:13px; line-height:1; }
+.size-current { font-size:12px; color:var(--muted); }
+.size-menu { width:148px; padding:6px; }
+.size-menu button { display:block; width:100%; text-align:left; appearance:none; border:0; background:transparent; color:var(--ink); padding:7px 9px; border-radius:var(--radius-sm); cursor:pointer; font-family:var(--ui); font-size:13px; }
+.size-menu button:hover, .size-menu button.sel { background:var(--surface-2); }
+.size-menu button.sel { font-weight:650; }
+
+/* whole-note scale — headings/badges/etc. are em-based, so scaling the base scales all */
+.editor.size-small { font-size:13px; }
+.editor.size-regular { font-size:14.5px; }
+.editor.size-large { font-size:16.5px; }
+.editor.size-supersize { font-size:19px; }
+
 /* ---------- color / badge popovers ---------- */
 .popover { position:absolute; z-index:45; background:var(--bg); border:1px solid var(--border); border-radius:var(--radius); box-shadow:var(--shadow); padding:8px; }
 .swatch-grid { display:grid; grid-template-columns:repeat(6,1fr); gap:6px; }
@@ -88,17 +113,46 @@ body { background:var(--bg); color:var(--ink); font-family:var(--ui); font-size:
 .editor h3 { font-size:1.08em; font-weight:650; margin:.5em 0 .25em; }
 .editor p { margin:.5em 0; }
 .editor ul, .editor ol { padding-left:1.4em; margin:.5em 0; }
-.editor li { margin:.15em 0; }
+.editor li { margin:.28em 0; }
 .editor a { color:var(--accent); text-decoration:underline; text-underline-offset:2px; cursor:pointer; }
 .editor blockquote { border-left:3px solid var(--accent); margin:.6em 0; padding:2px 0 2px 12px; color:var(--muted); }
 .editor blockquote + .src { margin-top:-.2em; }
 .editor .src { font-size:11.5px; color:var(--faint); margin:0 0 .8em; }
 .editor .src a { color:var(--accent); text-decoration:underline; text-underline-offset:2px; font-weight:550; }
-.editor pre { background:var(--surface-2); padding:10px 12px; border-radius:var(--radius-sm); overflow-x:auto; font-family:var(--mono); font-size:13px; white-space:pre-wrap; margin:.6em 0; }
+.editor pre { background:var(--surface-2); padding:10px 12px; border-radius:var(--radius-sm); overflow-x:auto; font-family:var(--mono); font-size:.9em; white-space:pre-wrap; margin:.6em 0; }
 .editor code { font-family:var(--mono); font-size:.92em; }
 .editor hr { border:0; border-top:1px solid var(--border); margin:1.1em 0; }
 .editor img { max-width:100%; border-radius:8px; margin:.4em 0; }
 .editor .badge { display:inline; padding:1px 8px; border-radius:999px; font-size:.82em; font-weight:650; line-height:1.7; white-space:nowrap; }
+
+/* ---------- Margin Numbers (per-note legal/hierarchical block numbering in a faint gutter) ---------- */
+.editor.numbered { counter-reset: mn; padding-left:48px; }
+.editor.numbered > *:not(hr):not(.src) { counter-increment: mn; position:relative; }
+.editor.numbered > *:not(hr):not(.src):nth-child(even) { background:var(--mn-tint); }
+/* top-level number — shown for every block except lists/tables (those carry n.x on their rows) */
+.editor.numbered > *:not(hr):not(.src):not(ul):not(ol):not(table)::before {
+  content: counter(mn);
+  position:absolute; top:0; left:-44px; width:34px;
+  text-align:right; font-family:var(--mono); font-size:10.5px; line-height:inherit;
+  color:var(--faint); -webkit-user-select:none; user-select:none; pointer-events:none;
+}
+/* list items & table rows — hierarchical n.x */
+.editor.numbered > ul, .editor.numbered > ol, .editor.numbered > table { counter-reset: mnsub; }
+.editor.numbered > ul > li, .editor.numbered > ol > li { counter-increment: mnsub; position:relative; }
+.editor.numbered > ul > li::before, .editor.numbered > ol > li::before {
+  content: counter(mn) "." counter(mnsub);
+  position:absolute; top:0; left:-66px; width:48px;
+  text-align:right; font-family:var(--mono); font-size:10.5px; line-height:inherit;
+  color:var(--faint); -webkit-user-select:none; user-select:none; pointer-events:none;
+}
+.editor.numbered > table tbody tr { counter-increment: mnsub; }
+.editor.numbered > table tbody tr > td:first-child { position:relative; }
+.editor.numbered > table tbody tr > td:first-child::before {
+  content: counter(mn) "." counter(mnsub);
+  position:absolute; top:6px; left:-44px; width:34px;
+  text-align:right; font-family:var(--mono); font-size:10.5px; line-height:1.3;
+  color:var(--faint); -webkit-user-select:none; user-select:none; pointer-events:none;
+}
 
 /* checklist */
 .editor ul.checklist { list-style:none; padding-left:2px; margin:.5em 0; }
