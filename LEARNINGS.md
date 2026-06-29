@@ -60,4 +60,6 @@ The side panel's top strip (app name, pin, close) is **Chrome-drawn and uncontro
 
 ## Data model
 
-**Page identity is `origin + pathname`** (lowercased, trailing slash trimmed; query/hash dropped). Non-http falls back to host. The planned evolution is a **`sources[]` set of full URLs** per note — the one structural fork that unlocks merge, multi-URL association, and provenance. Treat it as a migration when it lands.
+**Page identity is `origin + pathname`** (lowercased, trailing slash trimmed; query/hash dropped). Non-http falls back to host.
+
+**A note's identity is a `sources[]` set** *(shipped v0.7.0, #4)*, not a single page. Each entry is `{ url, key, host, at }`: `url` is the **full** URL (provenance, rarely shown), `key` is the normalized page identity above (used for matching — the association set), `host` for the list chip / non-web fallback. A note matches context if **any** source matches; `addSource()` unions a page in (dedup by `key`, or by `host` for non-web, upgrading a migrated key-only entry to a full URL). `migrateNote()` lifts legacy `{pageKey, host}` notes on load — idempotent, runs once, saves if it changed anything; pre-change notes have only the page key as their `url` (the full URL was never stored). Merge (#3) and Note info (#2) build on this. The `pendingCapture` object from the worker still carries `pageKey`/`host` for matching, plus `url` for the new source.

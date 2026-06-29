@@ -1,5 +1,13 @@
 # Margin — version log
 
+## v0.7.0 — 2026-06-29
+
+The `sources[]` model (Roadmap Phase 2, #4) — the keystone. A note's identity stops being a single page and becomes a **set of pages**.
+
+- **Sources, not one page (#4)** — every note now carries a `sources[]` set: the **full URL(s)** it was drawn from (the provenance trail, stored but rarely shown) keyed by normalized page (origin + path, query/hash dropped) for matching (the association set — where the note surfaces when unlocked). Existing notes migrate automatically on first load; pre-change notes keep the one page they had.
+- **Capture unions sources** — right-click "Save selection to Margin" into a locked note now records that page in the note's set, so a single note can span every page it borrowed from. Unlocked, it surfaces on **any** of those pages.
+- Groundwork for **Merge (#3)** (union two notes' source sets) and the **Note info menu (#2)** (show a note's URLs / created / updated) — both consume this model.
+
 ## v0.6.0 — 2026-06-29
 
 Editor wins (Roadmap Phase 1) — high-visibility, no new data model.
