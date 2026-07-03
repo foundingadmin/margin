@@ -23,6 +23,10 @@ The *second* thing these dumps reveal: the **editor itself is maturing** — lis
 - **Default theme — dark.** The side panel opens in dark mode by default.
 - **"Badge," never "highlight."** Highlight as a concept is retired; the term and the tool are *badge* everywhere.
 
+### ✅ Shipped in v0.11.0 (Azure UI)
+
+The first large front-end update: the **"Azure" brand** from the Claude Design handoff, plus the net-new surfaces it locked. The token re-theme (two-tier surfaces, slate-blue chrome accent, `--hairline`/`--mn-rail`/`--ok`) and local **Hanken Grotesk + JetBrains Mono** fonts landed first, then **Connected pages** (the `sources[]` set (#4) surfaced as a favicon chip row + connect/disconnect drawer), **Table of Contents (#13)** (a per-note translucent outline bar + frosted heading dropdown + scroll-progress), the **note ⋯ menu realignment** (icons, live accessories, Pin → Favorite, Markdown export alongside .html), and a glyph-based **save state** (check / pulsing dot / ×, never color-alone). The prototype's full-screen save-error flow was intentionally deferred — Margin saves to `chrome.storage.local`, so there is no network sync backend to troubleshoot.
+
 ### ✅ Shipped in v0.10.0 (Phase 3 — Provenance & capture)
 
 The differentiator cluster landed as a pair. **Paste-from-page (#5)** — a rebindable hotkey (`⌘/Ctrl+Shift+Y`) reads the active tab's live selection (`scripting` permission), opens the panel, and drops it into the note you're *currently viewing* at the caret, unioning that page into the note's `sources[]`. **Provenance display (#6)** — pasted blocks carry `data-src`/`data-srchost`; a per-note **Show paste sources** toggle reveals a faint *from ‹host›* under each, full URL on hover, off by default. **Decision locked:** only the *certain* source is tagged — free-form `⌘V` is left unmarked rather than guessed, so every `data-src` is trustworthy. (B4/B5 were already handled in the panel capture path that #5 reuses.)
@@ -123,7 +127,7 @@ Nav/UX overhaul landed: **blue icon** (one mid-tone glyph legible on every surfa
 
 ## Theme — Structure & navigation
 
-**13. Table of Contents** — auto-generated, auto-updating. Items = **H1** (Title) and their nested **H2** only; no other styles. A **non-invasive sticky** treatment. Genuinely ahead of most editors — a real differentiator if the sticky UX stays light. **Lift:** M.
+**13. Table of Contents** — ✅ **shipped v0.11.0.** A per-note toggle (note ⋯ menu) reveals a **non-invasive sticky** translucent outline bar above the editor; its frosted dropdown lists the note's headings (H1/H2/H3, hierarchy by weight + indent, active row highlighted) and a 2px scroll-progress bar tracks reading position — hugging the bar when closed, relocating to the menu when open. **Lift:** M.
 
 ---
 
