@@ -67,23 +67,18 @@
 }
 
 /* ---------------------------------------------------------------------------
-   TYPE FIDELITY (activate once the font files are committed to /fonts)
-   MV3 CSP forbids CDN fonts, so Hanken Grotesk + JetBrains Mono must ship in
-   the repo. Drop the woff2 files in /fonts and uncomment. Until then, --ui and
-   --mono fall back to the system stacks above, so nothing breaks.
-   ---------------------------------------------------------------------------
-   @font-face { font-family:"Hanken Grotesk"; font-weight:300; font-style:normal;
-     src:url("fonts/HankenGrotesk-Light.woff2") format("woff2"); font-display:swap; }
-   @font-face { font-family:"Hanken Grotesk"; font-weight:400; font-style:normal;
-     src:url("fonts/HankenGrotesk-Regular.woff2") format("woff2"); font-display:swap; }
-   @font-face { font-family:"Hanken Grotesk"; font-weight:500; font-style:normal;
-     src:url("fonts/HankenGrotesk-Medium.woff2") format("woff2"); font-display:swap; }
-   @font-face { font-family:"Hanken Grotesk"; font-weight:600; font-style:normal;
-     src:url("fonts/HankenGrotesk-SemiBold.woff2") format("woff2"); font-display:swap; }
-   @font-face { font-family:"Hanken Grotesk"; font-weight:700; font-style:normal;
-     src:url("fonts/HankenGrotesk-Bold.woff2") format("woff2"); font-display:swap; }
-   @font-face { font-family:"JetBrains Mono"; font-weight:400; font-style:normal;
-     src:url("fonts/JetBrainsMono-Regular.woff2") format("woff2"); font-display:swap; }
-   @font-face { font-family:"JetBrains Mono"; font-weight:500; font-style:normal;
-     src:url("fonts/JetBrainsMono-Medium.woff2") format("woff2"); font-display:swap; }
+   TYPE FIDELITY — Hanken Grotesk (UI + body) + JetBrains Mono (URLs, counts,
+   code, gutter numerals). MV3 CSP forbids CDN fonts, so the files ship in the
+   repo under /fonts. These are the Google Fonts *variable* faces (upright +
+   italic), converted to woff2, so a single file per style covers every weight
+   the brand uses (300 body / 400 / 500 / 600 / 700 headings). font-display:swap
+   keeps the system fallback visible until the face loads.
    --------------------------------------------------------------------------- */
+@font-face { font-family:"Hanken Grotesk"; font-weight:100 900; font-style:normal;
+  src:url("fonts/HankenGrotesk.woff2") format("woff2"); font-display:swap; }
+@font-face { font-family:"Hanken Grotesk"; font-weight:100 900; font-style:italic;
+  src:url("fonts/HankenGrotesk-Italic.woff2") format("woff2"); font-display:swap; }
+@font-face { font-family:"JetBrains Mono"; font-weight:100 800; font-style:normal;
+  src:url("fonts/JetBrainsMono.woff2") format("woff2"); font-display:swap; }
+@font-face { font-family:"JetBrains Mono"; font-weight:100 800; font-style:italic;
+  src:url("fonts/JetBrainsMono-Italic.woff2") format("woff2"); font-display:swap; }
