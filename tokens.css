@@ -1,47 +1,89 @@
 /* ===========================================================================
-   Margin — design tokens (the design-system seam)
+   Margin — design tokens (the design-system seam) · "Azure" brand
    ---------------------------------------------------------------------------
-   This file is the single source of truth for color, type, radius, and shadow.
-   It is the intended drop-in point for a UI design package from Claude Design:
-   a handoff updates the VALUES here, and the rest of the CSS — which only ever
-   references these via var(--token) — re-themes for free.
+   Single source of truth for color, type, radius, and shadow. This file is the
+   intended drop-in point for a UI design package from Claude Design: a handoff
+   updates the VALUES here, and the rest of the CSS — which only ever references
+   these via var(--token) — re-themes for free.
+
+   This revision adopts the "Azure" brand locked in the Margin Prototype:
+   - Two-tier surfaces. --bg = the LOWER editor plane (note body); --chrome =
+     the RAISED app plane (top bar, title/header band, format bar, footer).
+     The existing var() usage already maps to these planes, so the two-tier
+     look falls out for free (see the small sidepanel.css patches for the two
+     spots — .title-row and .rt-toolbar — that needed the raised fill made
+     explicit).
+   - Slate-blue accent #6F8BB3 = "app / chrome" only (New, active toggles,
+     links, focus, progress). It is NOT an ink color — the user-facing text
+     color tool is a separate 6-color status system baked into the editor.
+   - Cool graphite neutrals, dark default; a light theme is derived for parity.
 
    Rules of the road (see docs/DESIGN_INTEGRATION.md):
    - Keep token NAMES stable. sidepanel.css consumes them by name.
    - Light values live on :root; dark overrides live on .dark (the <body> gets
      the `dark` class toggled by the theme button). Default theme is dark.
    - Everything must stay local/self-contained — MV3 CSP forbids remote fonts
-     or stylesheets. Bundle font files in the repo if a handoff adds a typeface.
+     or stylesheets. To reach full type fidelity, commit Hanken Grotesk +
+     JetBrains Mono woff2 files to /fonts and activate the @font-face block at
+     the bottom of this file (kept commented until the files land).
    - Loaded BEFORE sidepanel.css in sidepanel.html so these definitions win the
      cascade as the base layer.
    =========================================================================== */
 
 :root {
-  /* surfaces */
-  --bg:#ffffff; --chrome:#f6f7f8; --surface-2:#eef0f2;
+  /* surfaces — --bg is the lower editor plane, --chrome the raised app plane */
+  --bg:#ffffff; --chrome:#f4f6f9; --surface-2:#e9edf3;
   /* text */
-  --ink:#1b1c1e; --muted:#62666c; --faint:#9aa0a6;
+  --ink:#1c2530; --muted:#5a6472; --faint:#8a94a2;
   /* lines */
-  --border:#e4e6e9;
-  /* accent + states */
-  --accent:#2f6fed; --accent-soft:#e8f0fe; --on-accent:#ffffff;
+  --border:#e2e7ee;
+  /* cross-plane hairline where the raised app plane meets the lower editor */
+  --hairline:#d4dbe4;
+  /* accent + states — slate-blue = app/chrome only */
+  --accent:#4a6d9c; --accent-soft:#e8eef6; --on-accent:#ffffff;
   --danger:#c0392b;
   /* elevation + shape */
-  --shadow:0 8px 24px rgba(20,24,31,.12);
-  --radius:10px; --radius-sm:7px;
+  --shadow:0 18px 42px -16px rgba(20,24,31,.28);
+  --radius:12px; --radius-sm:8px;
   /* type */
-  --ui:-apple-system,system-ui,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
-  --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
-  /* Margin Numbers gutter row tint */
-  --mn-tint:rgba(20,24,31,.022);
+  --ui:"Hanken Grotesk",-apple-system,system-ui,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+  /* Margin Numbers gutter — accent-tinted zebra band + faint rail */
+  --mn-tint:rgba(74,109,156,.06);
+  --mn-rail:rgba(74,109,156,.16);
 }
 
 .dark {
-  --bg:#1c1d1f; --chrome:#232427; --surface-2:#2c2e31;
-  --ink:#e9eaec; --muted:#a3a8af; --faint:#777c83;
-  --border:#34363a;
-  --accent:#6f9bff; --accent-soft:#27314a; --on-accent:#11151c;
-  --danger:#ec6a5c;
-  --shadow:0 10px 28px rgba(0,0,0,.45);
-  --mn-tint:rgba(255,255,255,.026);
+  /* two-tier: lower editor plane vs. raised app plane */
+  --bg:#12161c; --chrome:#232a36; --surface-2:#2c3441;
+  --ink:#e5e9ef; --muted:#9aa4b2; --faint:#8a94a2;
+  --border:#232a34;
+  --hairline:#38424f;
+  --accent:#6f8bb3; --accent-soft:rgba(111,139,179,.16); --on-accent:#0e1116;
+  --danger:#e5707a;
+  --shadow:0 22px 48px -14px rgba(0,0,0,.7);
+  --mn-tint:rgba(124,158,212,.06);
+  --mn-rail:rgba(124,158,212,.13);
 }
+
+/* ---------------------------------------------------------------------------
+   TYPE FIDELITY (activate once the font files are committed to /fonts)
+   MV3 CSP forbids CDN fonts, so Hanken Grotesk + JetBrains Mono must ship in
+   the repo. Drop the woff2 files in /fonts and uncomment. Until then, --ui and
+   --mono fall back to the system stacks above, so nothing breaks.
+   ---------------------------------------------------------------------------
+   @font-face { font-family:"Hanken Grotesk"; font-weight:300; font-style:normal;
+     src:url("fonts/HankenGrotesk-Light.woff2") format("woff2"); font-display:swap; }
+   @font-face { font-family:"Hanken Grotesk"; font-weight:400; font-style:normal;
+     src:url("fonts/HankenGrotesk-Regular.woff2") format("woff2"); font-display:swap; }
+   @font-face { font-family:"Hanken Grotesk"; font-weight:500; font-style:normal;
+     src:url("fonts/HankenGrotesk-Medium.woff2") format("woff2"); font-display:swap; }
+   @font-face { font-family:"Hanken Grotesk"; font-weight:600; font-style:normal;
+     src:url("fonts/HankenGrotesk-SemiBold.woff2") format("woff2"); font-display:swap; }
+   @font-face { font-family:"Hanken Grotesk"; font-weight:700; font-style:normal;
+     src:url("fonts/HankenGrotesk-Bold.woff2") format("woff2"); font-display:swap; }
+   @font-face { font-family:"JetBrains Mono"; font-weight:400; font-style:normal;
+     src:url("fonts/JetBrainsMono-Regular.woff2") format("woff2"); font-display:swap; }
+   @font-face { font-family:"JetBrains Mono"; font-weight:500; font-style:normal;
+     src:url("fonts/JetBrainsMono-Medium.woff2") format("woff2"); font-display:swap; }
+   --------------------------------------------------------------------------- */
