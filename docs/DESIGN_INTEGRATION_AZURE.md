@@ -49,3 +49,25 @@ failures around a network sync backend (`sync.margin.app`) that does not exist h
 persists to `chrome.storage.local`. The three-state footer indicator covers how storage
 actually behaves; the troubleshooting screen was left out rather than shipped with fictional
 copy. Revisit if a sync backend is ever added.
+
+## Round 2 — editor polish (v0.12.0)
+
+A second pass over the **editor** surface against the updated Margin Prototype, closing the
+gaps the first round left open. All restyle + small JS hooks; no token names or DOM IDs renamed.
+
+- **Created / edited subtitle** (`#note-sub`) under the title, read off `createdAt` / `updatedAt`.
+- **Format bar to spec** — text-size control becomes the stacked-"A" glyph (the `#size-current`
+  label is kept for a11y but visually hidden), the color tool becomes the "A"-over-warm-bar ink
+  glyph, and a right-aligned **"/ cmd"** accent pill (the repurposed `#plus-btn`) opens the slash
+  menu. The link (↗) and clear (⌫) buttons left the bar to match the prototype's single clean row;
+  linking stays on `⌘/Ctrl+K`, which was already bound.
+- **Brand-colored favicon chips** — a `BRAND_TILE` / `BRAND_NAME` map tints and proper-cases
+  recognized hosts (Linear, Claude, GitHub, …); `sourceColor()` falls back to the hash hue.
+- **Footer "#" Margin Numbers toggle** (`#mn-toggle`) mirroring the note's `numbered` state, plus
+  the selection count rendered as an accent pill.
+
+### Deferred to a later per-surface increment
+
+The package's **App - Home** (filter-chip row + richer note rows), **App - Settings** page, and
+**App - User Guide** restyle were not part of this round — the shown prototype was the editor, and
+the intake model is one surface at a time.

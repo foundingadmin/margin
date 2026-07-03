@@ -34,7 +34,7 @@ body { background:var(--bg); color:var(--ink); font-family:var(--ui); font-size:
 .pill-toggle.on { background:var(--accent); border-color:var(--accent); color:var(--on-accent); }
 
 /* ---------- title ---------- */
-.title-input { appearance:none; border:0; background:transparent; color:var(--ink); font-family:var(--ui); font-size:19px; font-weight:680; letter-spacing:-.01em; padding:12px 16px 6px; width:100%; }
+.title-input { appearance:none; border:0; background:transparent; color:var(--ink); font-family:var(--ui); font-size:21px; font-weight:700; letter-spacing:-.02em; line-height:1.18; padding:13px 16px 2px; width:100%; }
 .title-input:focus { outline:none; }
 .title-input::placeholder { color:var(--faint); }
 /* hover affordance: a pencil eases in + the title shifts toward accent, signalling "click to rename" */
@@ -497,3 +497,60 @@ a.cd-url:hover { color:var(--accent); }
 .toc-row.lvl3 .toc-rowtitle { padding-left:28px; font-weight:400; }
 .toc-row.is-active .toc-rowtitle { color:var(--ink); }
 .toc-empty { padding:14px 12px; font-size:12.5px; color:var(--muted); }
+
+/* ===========================================================================
+   Prototype refinements (Margin Prototype handoff — round 2)
+   ---------------------------------------------------------------------------
+   The created/edited subtitle, the format-bar size glyph + color glyph + "/ cmd"
+   affordance, the footer "#" Margin Numbers toggle + selection pill. Restyle
+   plus a few small JS-wired hooks; everything routes through tokens.css.
+   =========================================================================== */
+
+/* Created / edited provenance line under the title (raised app plane). */
+.note-sub {
+  background:var(--chrome); color:var(--faint);
+  font-family:var(--ui); font-size:11.5px; font-weight:400; line-height:1.3;
+  padding:2px 16px 8px;
+}
+.note-sub:empty { display:none; }
+
+/* Text-size control: two stacked "A" glyphs (small + large), no label text.
+   #size-current is kept in the DOM for the JS/a11y label but hidden visually. */
+.size-trigger .ic-size { display:inline-flex; align-items:baseline; gap:1px; line-height:1; }
+.size-trigger .ic-size-sm { font-weight:700; font-size:10px; }
+.size-trigger .ic-size-lg { font-weight:700; font-size:14px; }
+.size-current { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; }
+
+/* Color/badge glyph: an "A" over a fixed warm underline bar (matches the ink
+   color tool's swatch trigger in the prototype). */
+.ic-color { display:inline-flex; flex-direction:column; align-items:center; gap:1px; line-height:1; }
+.ic-color-a { font-weight:800; font-size:12px; }
+.ic-color-bar { width:14px; height:3px; border-radius:2px; background:#e08a4e; }
+
+/* "/ cmd" affordance — right-aligned accent pill that opens the slash menu. */
+.tb-spacer { flex:1 1 auto; }
+.rt-toolbar button.cmd-pill {
+  min-width:0; height:26px; padding:0 9px; gap:5px;
+  background:var(--accent-soft); color:var(--accent);
+  font-family:var(--mono); font-size:11.5px; font-weight:600;
+}
+.rt-toolbar button.cmd-pill:hover { background:color-mix(in srgb, var(--accent) 22%, transparent); color:var(--accent); }
+.cmd-pill .cmd-slash { font-family:var(--mono); font-weight:700; }
+
+/* Footer "#" Margin Numbers quick-toggle + selection pill. */
+.mn-toggle {
+  appearance:none; flex:none; width:24px; height:24px; margin-right:2px;
+  display:grid; place-items:center; border:1px solid var(--border); border-radius:7px;
+  background:transparent; color:var(--muted); font-family:var(--mono); font-size:13px;
+  font-weight:600; line-height:1; cursor:pointer;
+}
+.mn-toggle:hover { color:var(--ink); border-color:var(--muted); }
+.mn-toggle.on {
+  color:var(--accent); background:var(--accent-soft);
+  border-color:color-mix(in srgb, var(--accent) 32%, transparent);
+}
+.sb-spacer { flex:1 1 auto; }
+#counts .sel-pill {
+  margin-left:8px; padding:2px 8px; border-radius:6px;
+  background:var(--accent-soft); color:var(--accent); font-weight:600;
+}
