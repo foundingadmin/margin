@@ -30,6 +30,9 @@
         <button id="note-menu-btn" class="icon-btn" title="Note actions" aria-label="Note actions">⋯</button>
       </div>
 
+      <!-- created / edited provenance line under the title -->
+      <div id="note-sub" class="note-sub"></div>
+
       <!-- note-level menu (kebab on title row) — single-note actions -->
       <div id="note-menu" class="menu" hidden>
         <button data-act="connected"><span class="mi-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg></span><span class="mi-label">Connected pages</span><span class="mi-trail" id="conn-trail"></span></button>
@@ -54,7 +57,7 @@
         </div>
         <div class="size-dd">
           <button id="size-trigger" class="size-trigger" title="Text size — scales the whole note (accessibility)" aria-label="Text size">
-            <span class="ic-size" aria-hidden="true">A</span><span id="size-current" class="size-current">Regular</span><span class="caret" aria-hidden="true">▾</span>
+            <span class="ic-size" aria-hidden="true"><span class="ic-size-sm">A</span><span class="ic-size-lg">A</span></span><span id="size-current" class="size-current">Regular</span><span class="caret" aria-hidden="true">▾</span>
           </button>
         </div>
         <span class="divider"></span>
@@ -62,15 +65,13 @@
         <button data-cmd="italic" title="Italic (⌘/Ctrl+I)"><i>I</i></button>
         <button data-cmd="underline" title="Underline (⌘/Ctrl+U)"><u>U</u></button>
         <button data-cmd="strikeThrough" title="Strikethrough"><s>S</s></button>
-        <button id="color-btn" title="Text color & badge"><span class="ic-badge" aria-hidden="true">A</span><span class="caret" aria-hidden="true">▾</span></button>
+        <button id="color-btn" title="Text color & badge"><span class="ic-color" aria-hidden="true"><span class="ic-color-a">A</span><span class="ic-color-bar"></span></span><span class="caret" aria-hidden="true">▾</span></button>
         <span class="divider"></span>
         <button data-cmd="insertUnorderedList" title="Bulleted list (⌘/Ctrl+Shift+8)">•</button>
         <button data-cmd="insertOrderedList" title="Numbered list (⌘/Ctrl+Shift+7)">1.</button>
         <button id="checklist-btn" title="Checklist (⌘/Ctrl+Shift+9)">☑</button>
-        <button data-cmd="createLink" title="Link (⌘/Ctrl+K)">↗</button>
-        <span class="divider"></span>
-        <button id="plus-btn" title="Insert block (/)">＋</button>
-        <button data-cmd="removeFormat" title="Clear formatting">⌫</button>
+        <span class="tb-spacer"></span>
+        <button id="plus-btn" class="cmd-pill" title="Insert block (/)"><span class="cmd-slash">/</span>cmd</button>
       </div>
 
       <!-- Connected pages: collapsed favicon chip row + pinned count chip (JS-rendered).
@@ -90,7 +91,9 @@
       <div id="editor" class="editor" contenteditable="true" spellcheck="true" aria-label="Note body"></div>
 
       <footer class="statusbar">
+        <button id="mn-toggle" class="mn-toggle" title="Margin Numbers" aria-label="Toggle Margin Numbers" aria-pressed="false">#</button>
         <span id="counts">0 words · 0 characters</span>
+        <span class="sb-spacer"></span>
         <span id="save-status" class="save-status">Saved</span>
       </footer>
 

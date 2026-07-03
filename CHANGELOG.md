@@ -1,5 +1,16 @@
 # Margin — version log
 
+## v0.12.0 — 2026-07-03
+
+Azure editor polish — a second Claude Design round for the editor surface, closing the remaining gaps between the shipped app and the Margin Prototype. Restyle plus small JS-wired hooks; no token names or DOM IDs renamed.
+
+- **Created / edited subtitle** — a provenance line under the title ("Created Jun 24 · Edited 2m ago") reads straight off the note's `createdAt` / `updatedAt` and refreshes live as you type.
+- **Format bar to spec** — a single clean row: the text-size control is now the stacked "A" glyph (its label kept for a11y, hidden visually), the color tool shows the "A"-over-warm-bar ink glyph, and a right-aligned **"/ cmd"** accent pill opens the slash menu. The redundant link (↗) and clear (⌫) buttons leave the bar — linking stays on **⌘/Ctrl+K**.
+- **Brand-colored source chips** — recognized hosts (Linear, Claude, GitHub, Figma, Notion, Stripe, Reddit, Google, and more) get their brand tint + proper-cased name in the connected-pages chip row; anything unlisted keeps the deterministic hash hue.
+- **Footer Margin Numbers toggle** — a **"#"** quick-toggle on the left of the status bar mirrors (and flips) the note's Margin Numbers state, alongside the ⋯-menu entry; the selection word/char count now reads as an accent pill.
+- **Larger title** — the note title steps up to the prototype's 21px / 700 weight.
+- **Scope** — this round covers the editor (the shown prototype). The package's Home filter-chips, Settings page, and User Guide restyle remain a later per-surface increment, per the incremental intake model in `docs/DESIGN_INTEGRATION.md`.
+
 ## v0.11.0 — 2026-07-03
 
 Azure UI — the first large front-end update. Adopts the "Azure" brand from the Claude Design handoff and builds the net-new surfaces it locked, one reviewable commit each.

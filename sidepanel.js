@@ -258,23 +258,43 @@ function openNote(id) {
   editor.classList.toggle("show-prov", !!n.showProv);
   syncNoteMenu();
   $("note-menu").hidden = true;
+  renderNoteSub(n); syncMnToggle(n);
   setStatus("Saved"); updateCounts(); syncToolbar();
   $("conn-drawer").hidden = true; renderConn(n);
   $("toc-menu").hidden = true; renderToc(n);
   showEditor();
 }
+// Compact "Jun 24" for the created stamp (relTime gives the fuzzy "edited" half).
+function fmtShortDate(ts) { return ts ? new Date(ts).toLocaleDateString(undefined, { month: "short", day: "numeric" }) : ""; }
+// The provenance line under the title: when the note was created and last edited.
+function renderNoteSub(n) {
+  const el = $("note-sub"); if (!el) return;
+  if (!n) { el.textContent = ""; return; }
+  el.textContent = `Created ${fmtShortDate(n.createdAt)} · Edited ${relTime(n.updatedAt)}`;
+}
+// Footer "#" quick-toggle mirrors the note's Margin Numbers state.
+function syncMnToggle(n) {
+  const b = $("mn-toggle"); if (!b) return;
+  const on = !!(n && n.numbered);
+  b.classList.toggle("on", on); b.setAttribute("aria-pressed", String(on));
+}
 function updateCounts() {
   const text = editor.innerText || "";
   const words = (text.trim().match(/\S+/g) || []).length;
   const chars = text.replace(/\u200B/g, "").replace(/\n$/, "").length;
-  let out = `${words} ${words === 1 ? "word" : "words"} · ${chars} ${chars === 1 ? "character" : "characters"}`;
+  const base = `${words} ${words === 1 ? "word" : "words"} · ${chars} ${chars === 1 ? "character" : "characters"}`;
+  let pill = "";
   const sel = window.getSelection();
   if (sel && sel.rangeCount && !sel.isCollapsed && editor.contains(sel.anchorNode) && editor.contains(sel.focusNode)) {
     const str = sel.toString();
     const selChars = str.length;
-    if (selChars > 0) { const selWords = (str.trim().match(/\S+/g) || []).length; out += `  ·  ${selWords} ${selWords === 1 ? "word" : "words"} selected`; }
+    if (selChars > 0) {
+      const selWords = (str.trim().match(/\S+/g) || []).length;
+      pill = `<span class="sel-pill">${selWords} ${selWords === 1 ? "word" : "words"} · ${selChars} ${selChars === 1 ? "character" : "characters"} selected</span>`;
+    }
   }
-  $("counts").textContent = out;
+  const c = $("counts"); c.textContent = base; if (pill) c.insertAdjacentHTML("beforeend", pill);
+  renderNoteSub(activeNote());
 }
 function queueSave() {
   const n = activeNote(); if (!n) return;
@@ -302,6 +322,7 @@ function toggleMarginNumbers() {
   const n = activeNote(); if (!n) return;
   n.numbered = !n.numbered; n.updatedAt = now();
   editor.classList.toggle("numbered", n.numbered);
+  syncMnToggle(n); syncNoteMenu();
   saveNotes(); $("note-menu").hidden = true;
 }
 // Refresh the note ••• menu's live accessories (source count, toggle checks, favorite state).
@@ -407,14 +428,42 @@ const CONN_ICON = {
   globe: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2a15 15 0 0 1 4 10 15 15 0 0 1-4 10 15 15 0 0 1-4-10 15 15 0 0 1 4-10z"/><path d="M2 12h20"/></svg>',
 };
 let connQuery = "";
-// Deterministic tile color from a host string, so each site keeps a stable hue.
+// Known-host brand tints, so recognizable sites (Linear, Claude, GitHub…) read
+// as themselves in the favicon chip; anything unlisted falls back to the
+// deterministic hash hue below. White glyph is legible on every value here.
+const BRAND_TILE = {
+  "linear.app":"#5e6ad2", "claude.ai":"#c96442", "github.com":"#30363d",
+  "figma.com":"#a259ff", "notion.so":"#2f2f2f", "stripe.com":"#635bff",
+  "reddit.com":"#ff4500", "youtube.com":"#ff0000", "google.com":"#4285f4",
+  "docs.google.com":"#4285f4", "drive.google.com":"#4285f4", "mail.google.com":"#ea4335",
+  "linkedin.com":"#0a66c2", "medium.com":"#242424", "vercel.com":"#111111",
+  "gitlab.com":"#fc6d26", "slack.com":"#611f69", "x.com":"#111111", "twitter.com":"#111111",
+};
+// Proper-cased display names for recognized hosts (siteName only title-cases the
+// first letter, which would render "Github"/"Linkedin"/"Youtube").
+const BRAND_NAME = {
+  "github.com":"GitHub", "gitlab.com":"GitLab", "linkedin.com":"LinkedIn",
+  "youtube.com":"YouTube", "figjam.com":"FigJam", "x.com":"X", "twitter.com":"X",
+};
+function brandColor(host) {
+  if (!host) return null;
+  const h = host.replace(/^www\./, "");
+  return BRAND_TILE[h] || BRAND_TILE[h.split(".").slice(-2).join(".")] || null;
+}
+function brandName(host) {
+  if (!host) return null;
+  const h = host.replace(/^www\./, "");
+  return BRAND_NAME[h] || BRAND_NAME[h.split(".").slice(-2).join(".")] || null;
+}
+// Tile color from a host string: brand tint when known, else a stable hash hue.
 function sourceColor(host) {
+  const brand = brandColor(host); if (brand) return brand;
   const s = host || "?"; let h = 0;
   for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
   return `hsl(${h % 360} 42% 46%)`;
 }
 function sourceInitial(host) { return (siteName(host) || "?").charAt(0).toUpperCase(); }
-function sourceLabel(s) { return siteName(s.host) || s.host || (s.url || s.key || "Page"); }
+function sourceLabel(s) { return brandName(s.host) || siteName(s.host) || s.host || (s.url || s.key || "Page"); }
 function isCurrentSource(s) {
   if (state.pageKey) return s.key === state.pageKey;
   if (state.host) return !s.key && s.host === state.host;
@@ -1361,6 +1410,7 @@ function bind() {
   // toolbar commands
   document.querySelectorAll('.rt-toolbar [data-cmd]').forEach((b) => b.addEventListener("click", () => exec(b.dataset.cmd)));
   $("checklist-btn").addEventListener("click", makeChecklist);
+  $("mn-toggle").addEventListener("click", (e) => { e.stopPropagation(); toggleMarginNumbers(); focusEditor(); });
   $("plus-btn").addEventListener("click", (e) => { e.stopPropagation(); focusEditor(); slashCtx = null; showSlash(""); });
   $("color-btn").addEventListener("click", (e) => { e.stopPropagation(); saveRange(); openPopover("color-pop", $("color-btn")); });
 
