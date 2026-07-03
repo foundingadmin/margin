@@ -211,7 +211,14 @@ body { background:var(--bg); color:var(--ink); font-family:var(--ui); font-size:
 
 /* ---------- footer ---------- */
 .statusbar { flex:0 0 auto; display:flex; justify-content:space-between; align-items:center; padding:8px 16px; border-top:1px solid var(--border); background:var(--chrome); color:var(--faint); font-size:11.5px; }
-.save-status.saving { color:var(--accent); }
+/* Save state — glyph + label, never color-alone (brand AA). */
+.save-status { display:inline-flex; align-items:center; gap:5px; color:var(--muted); }
+.save-status svg { width:13px; height:13px; flex:none; }
+.save-status[data-state="saved"] svg { color:var(--ok); }
+.save-status[data-state="error"] { color:var(--danger); }
+.save-status[data-state="error"] svg { color:var(--danger); }
+.save-dot { width:6px; height:6px; border-radius:50%; background:var(--accent); flex:none; animation:save-pulse 1s ease-in-out infinite; }
+@keyframes save-pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.3;transform:scale(.55)} }
 
 /* ---------- overflow menu ---------- */
 #view-editor { position:relative; }

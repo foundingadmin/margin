@@ -126,7 +126,10 @@ async function load() {
   state.notes.forEach((n) => { if (migrateNote(n)) migrated = true; });
   if (migrated) await saveNotes();
 }
-async function saveNotes() { await chrome.storage.local.set({ [STORE_KEY]: state.notes }); }
+async function saveNotes() {
+  try { await chrome.storage.local.set({ [STORE_KEY]: state.notes }); return true; }
+  catch (e) { setStatus("Save failed", "error"); return false; }
+}
 async function saveSettings() { await chrome.storage.local.set({ [SETTINGS_KEY]: state.settings }); }
 
 /* ---------- theme (binary) ---------- */
@@ -224,7 +227,23 @@ async function showBrowser() {
 
 /* ---------- editor core ---------- */
 let saveTimer = null, cssModeSet = false;
-function setStatus(t, saving) { const el = $("save-status"); el.textContent = t; el.classList.toggle("saving", !!saving); }
+// Save state is never color-alone (brand AA): every state pairs a glyph with a
+// label. saving = pulsing dot, saved = check, error = ×. Legacy callers pass
+// `true` for the saving flag; that still maps to the "saving" state.
+const SAVE_ICON = {
+  saved: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>',
+  error: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>',
+};
+const SAVE_TITLE = { saved: "All changes saved", saving: "Saving…", error: "Couldn't save to local storage" };
+function setStatus(t, state) {
+  const el = $("save-status"); if (!el) return;
+  const s = state === true ? "saving" : (state || "saved");
+  el.dataset.state = s;
+  el.title = SAVE_TITLE[s] || "";
+  el.innerHTML = (s === "saving" ? '<span class="save-dot" aria-hidden="true"></span>' : SAVE_ICON[s] || "") +
+    '<span class="save-label"></span>';
+  el.lastChild.textContent = t;
+}
 function activeNote() { return state.notes.find((x) => x.id === state.activeId); }
 function ensureCssMode() { if (!cssModeSet) { try { document.execCommand("styleWithCSS", false, true); } catch (e) {} cssModeSet = true; } }
 function openNote(id) {
@@ -263,11 +282,11 @@ function queueSave() {
   n.html = sanitizeHtml(editor.innerHTML);
   if (n.ephemeral && htmlToText(n.html).trim() !== "") n.ephemeral = false;
   n.updatedAt = now();
-  setStatus("Saving…", true); updateCounts();
+  setStatus("Saving…", "saving"); updateCounts();
   clearTimeout(saveTimer);
-  saveTimer = setTimeout(async () => { await saveNotes(); setStatus("Saved"); }, 400);
+  saveTimer = setTimeout(async () => { if (await saveNotes()) setStatus("Saved"); }, 400);
 }
-function flashSaved() { setStatus("Saved ✓"); setTimeout(() => setStatus("Saved"), 900); }
+function flashSaved() { setStatus("Saved"); }
 
 async function newNote() { await refreshHost(); pruneIfEmpty(state.activeId); const n = createContextualNote(state.host, true); await saveNotes(); openNote(n.id); editor.focus(); }
 async function ensureForActiveTab() { let n = latestContextNote(); if (!n) { n = createContextualNote(state.host, true); await saveNotes(); } openNote(n.id); }
@@ -766,7 +785,7 @@ async function consumePendingCapture() {
   await chrome.storage.session.remove("margin.pendingCapture");
   if (now() - (cap.at || 0) > 15000) return false; // stale (e.g. browser restarted) — drop it
   if (cap.empty) { // paste-from-page (#5) fired with nothing selected (or an unreadable page)
-    setStatus("No selection on the page"); setTimeout(() => setStatus("Saved"), 1600); return false;
+    setStatus("No selection on the page", "error"); setTimeout(() => setStatus("Saved"), 1600); return false;
   }
   if (!cap.html) return false;
 
@@ -1113,7 +1132,7 @@ function bind() {
 }
 
 /* ---------- copy / export ---------- */
-async function copyNote() { const n = activeNote(); if (!n) return; try { await navigator.clipboard.writeText(editor.innerText || ""); setStatus("Copied ✓"); setTimeout(() => setStatus("Saved"), 1200); } catch { setStatus("Copy failed"); } $("note-menu").hidden = true; }
+async function copyNote() { const n = activeNote(); if (!n) return; try { await navigator.clipboard.writeText(editor.innerText || ""); setStatus("Copied", "saved"); setTimeout(() => setStatus("Saved"), 1200); } catch { setStatus("Copy failed", "error"); } $("note-menu").hidden = true; }
 function exportNote() {
   const n = activeNote(); if (!n) return;
   const doc = `<!doctype html><meta charset="utf-8"><title>${(n.title || "note").replace(/[<>&]/g, "")}</title><h1>${n.title || "Untitled"}</h1>` + sanitizeHtml(n.html || "");
