@@ -1,5 +1,15 @@
 # Margin — version log
 
+## v0.11.0 — 2026-07-03
+
+Azure UI — the first large front-end update. Adopts the "Azure" brand from the Claude Design handoff and builds the net-new surfaces it locked, one reviewable commit each.
+
+- **Azure re-theme + brand type** — `tokens.css` re-themes to the two-tier surface system (`--bg` = the lower editor plane, `--chrome` = the raised app plane), a slate-blue chrome accent, cool graphite neutrals, and new `--hairline` / `--mn-rail` / `--ok` tokens. Because the rest of the CSS reads tokens by name, the two-tier look falls out for free; a small appended override block raises the title row + format bar onto the app plane, sets body copy to weight 300, accent-tints active toggles, and pins an AA focus ring. **Hanken Grotesk** (UI + body) and **JetBrains Mono** (URLs, counts, code, gutter numerals) now ship locally under `/fonts` (variable woff2, MV3-CSP-safe) — no more system-stack fallback.
+- **Connected pages** — the `sources[]` set (#4) made visible and editable. A collapsed favicon chip row (current page tinted) + a pinned count chip open a drawer: a filter joined flush to a recessed list inset, one row per page (name, "Current page" badge or click-to-open URL, hover-reveal Disconnect), plus Connect-this-page / Add-a-custom-URL. Connecting and disconnecting edit the note's source set directly. Same entry in the ⋯ menu.
+- **Table of contents (#13)** — a per-note toggle reveals a translucent sticky outline bar above the editor; its frosted dropdown lists the note's headings (weight + indent hierarchy, active row highlighted) and a 2px scroll-progress bar tracks reading position, hugging the bar when closed and the menu when open.
+- **Note ••• menu realignment** — reordered to the locked single-note layout with a Lucide icon per row and live accessories (source count, on/Off checks); **Pin → Favorite** (stored field unchanged); **Download** now offers **.md** alongside .html. The shipped-after-handoff rows (Note info, Show paste sources) are kept.
+- **Save state** — the footer indicator moves off color-alone (brand AA): check (saved) / pulsing dot (saving) / × (save failed), each with a label; a real storage write failure now surfaces the error state instead of silently claiming "Saved".
+
 ## v0.10.0 — 2026-06-29
 
 Provenance & capture (Roadmap Phase 3) — paste-from-page (#5) + provenance display (#6), shipped as a pair.

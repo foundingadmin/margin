@@ -30,16 +30,20 @@
         <button id="note-menu-btn" class="icon-btn" title="Note actions" aria-label="Note actions">⋯</button>
       </div>
 
-      <!-- note-level menu (kebab on title row) -->
+      <!-- note-level menu (kebab on title row) — single-note actions -->
       <div id="note-menu" class="menu" hidden>
-        <button data-act="copy">Copy note text</button>
-        <button data-act="export">Download .html</button>
-        <button data-act="pin"><span id="pin-label">Pin note</span></button>
-        <button data-act="mnumbers"><span id="mn-label">Show Margin Numbers</span></button>
-        <button data-act="prov" id="prov-item" hidden><span id="prov-label">Show paste sources</span></button>
-        <button data-act="info">Note info</button>
+        <button data-act="connected"><span class="mi-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg></span><span class="mi-label">Connected pages</span><span class="mi-trail" id="conn-trail"></span></button>
+        <button data-act="toc"><span class="mi-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h.01"/><path d="M3 12h.01"/><path d="M3 18h.01"/><path d="M8 6h13"/><path d="M8 12h13"/><path d="M8 18h13"/></svg></span><span class="mi-label">Table of contents</span><span class="mi-trail" id="toc-trail"></span></button>
+        <button data-act="mnumbers"><span class="mi-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" x2="20" y1="9" y2="9"/><line x1="4" x2="20" y1="15" y2="15"/><line x1="10" x2="8" y1="3" y2="21"/><line x1="16" x2="14" y1="3" y2="21"/></svg></span><span class="mi-label" id="mn-label">Margin Numbers</span><span class="mi-trail" id="mn-trail"></span></button>
         <div class="menu-sep"></div>
-        <button data-act="delete" class="danger">Delete note</button>
+        <button data-act="copy"><span class="mi-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></span><span class="mi-label">Copy note text</span></button>
+        <button data-act="export-md"><span class="mi-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg></span><span class="mi-label">Download</span><span class="mi-trail">.md</span></button>
+        <button data-act="export-html"><span class="mi-ic"></span><span class="mi-label">Download</span><span class="mi-trail">.html</span></button>
+        <button data-act="pin" id="fav-item"><span class="mi-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg></span><span class="mi-label" id="pin-label">Favorite</span></button>
+        <button data-act="info"><span class="mi-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg></span><span class="mi-label">Note info</span></button>
+        <button data-act="prov" id="prov-item" hidden><span class="mi-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7z"/><path d="M14 2v5h5"/><path d="M16 13H8"/><path d="M16 17H8"/><path d="M10 9H8"/></svg></span><span class="mi-label" id="prov-label">Show paste sources</span></button>
+        <div class="menu-sep"></div>
+        <button data-act="delete" class="danger"><span class="mi-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></span><span class="mi-label">Delete note</span></button>
       </div>
 
       <div class="rt-toolbar" id="rt-toolbar">
@@ -69,6 +73,20 @@
         <button data-cmd="removeFormat" title="Clear formatting">⌫</button>
       </div>
 
+      <!-- Connected pages: collapsed favicon chip row + pinned count chip (JS-rendered).
+           The open drawer lives in #conn-drawer below. -->
+      <div id="conn" class="conn" hidden aria-label="Connected pages"></div>
+
+      <!-- Table of contents: translucent outline bar between the format bar and the
+           editor. The frosted dropdown lives in #toc-menu below. -->
+      <div id="toc-bar" class="toc-bar" hidden aria-label="Table of contents">
+        <span id="toc-num" class="toc-num"></span>
+        <span id="toc-current" class="toc-current"></span>
+        <span id="toc-pos" class="toc-pos"></span>
+        <span class="toc-chev" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></span>
+        <div class="toc-progress"><div class="toc-progress-fill"></div></div>
+      </div>
+
       <div id="editor" class="editor" contenteditable="true" spellcheck="true" aria-label="Note body"></div>
 
       <footer class="statusbar">
@@ -81,6 +99,8 @@
       <div id="size-menu" class="popover size-menu" hidden></div>
       <div id="color-pop" class="popover" hidden></div>
       <div id="note-info" class="popover info-pop" hidden></div>
+      <div id="conn-drawer" class="conn-drawer" hidden aria-label="Connected pages"></div>
+      <div id="toc-menu" class="toc-menu" hidden aria-label="Outline"></div>
       <div id="slash" class="slash" hidden></div>
       <input id="image-input" type="file" accept="image/*" hidden />
     </section>
