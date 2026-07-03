@@ -69,6 +69,10 @@
         <button data-cmd="removeFormat" title="Clear formatting">⌫</button>
       </div>
 
+      <!-- Connected pages: collapsed favicon chip row + pinned count chip (JS-rendered).
+           The open drawer lives in #conn-drawer below. -->
+      <div id="conn" class="conn" hidden aria-label="Connected pages"></div>
+
       <div id="editor" class="editor" contenteditable="true" spellcheck="true" aria-label="Note body"></div>
 
       <footer class="statusbar">
@@ -81,6 +85,7 @@
       <div id="size-menu" class="popover size-menu" hidden></div>
       <div id="color-pop" class="popover" hidden></div>
       <div id="note-info" class="popover info-pop" hidden></div>
+      <div id="conn-drawer" class="conn-drawer" hidden aria-label="Connected pages"></div>
       <div id="slash" class="slash" hidden></div>
       <input id="image-input" type="file" accept="image/*" hidden />
     </section>

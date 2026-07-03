@@ -261,6 +261,7 @@ function openNote(id) {
   syncProvMenuItem();
   $("note-menu").hidden = true;
   setStatus("Saved"); updateCounts(); syncToolbar();
+  $("conn-drawer").hidden = true; renderConn(n);
   showEditor();
 }
 function updateCounts() {
@@ -377,6 +378,183 @@ function showNoteInfo() {
 
   openPopover("note-info", $("note-menu-btn"));
 }
+
+/* ---------- Connected pages — the sources[] set, made visible & editable ----------
+   A note's sources[] IS its identity as a set of pages (see the sources helpers
+   above). This band + drawer let the user see, connect, and disconnect those
+   pages. The read model already exists; the drawer adds connect / disconnect /
+   add-custom-URL mutations. Favicons aren't fetched (no host permission), so each
+   page shows a colored initial tile derived deterministically from its host. */
+const CONN_ICON = {
+  link:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>',
+  chev:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>',
+  search:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>',
+  ext:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>',
+  x:     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>',
+  plus:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>',
+  check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>',
+  globe: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2a15 15 0 0 1 4 10 15 15 0 0 1-4 10 15 15 0 0 1-4-10 15 15 0 0 1 4-10z"/><path d="M2 12h20"/></svg>',
+};
+let connQuery = "";
+// Deterministic tile color from a host string, so each site keeps a stable hue.
+function sourceColor(host) {
+  const s = host || "?"; let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+  return `hsl(${h % 360} 42% 46%)`;
+}
+function sourceInitial(host) { return (siteName(host) || "?").charAt(0).toUpperCase(); }
+function sourceLabel(s) { return siteName(s.host) || s.host || (s.url || s.key || "Page"); }
+function isCurrentSource(s) {
+  if (state.pageKey) return s.key === state.pageKey;
+  if (state.host) return !s.key && s.host === state.host;
+  return false;
+}
+// Is the active tab's page already in the note's set?
+function currentPageConnected(n) {
+  const src = n.sources || [];
+  if (state.pageKey) return src.some((s) => s.key === state.pageKey);
+  if (state.host) return src.some((s) => s.host === state.host);
+  return false;
+}
+function connIcon(name, cls) { const e = elc("span", cls || "conn-ic"); e.innerHTML = CONN_ICON[name] || ""; return e; }
+function faviconTile(s, cls) {
+  const t = elc("span", cls || "conn-fav");
+  t.style.background = sourceColor(s.host); t.textContent = sourceInitial(s.host);
+  return t;
+}
+
+// Always-visible band: horizontal favicon chip row + pinned count chip.
+function renderConn(n) {
+  const band = $("conn"); band.innerHTML = "";
+  if (!n || !isEditorView()) { band.hidden = true; return; }
+  band.hidden = false;
+  const srcs = n.sources || [];
+
+  const row = elc("div", "conn-row");
+  srcs.forEach((s) => {
+    const chip = elc("button", "conn-chip" + (isCurrentSource(s) ? " is-current" : ""));
+    chip.appendChild(faviconTile(s));
+    const nm = elc("span", "conn-chip-name"); nm.textContent = sourceLabel(s); chip.appendChild(nm);
+    if (/^https?:/i.test(s.url || "")) { chip.title = s.url; chip.addEventListener("click", () => chrome.tabs.create({ url: s.url })); }
+    row.appendChild(chip);
+  });
+  band.appendChild(row);
+
+  const count = elc("button", "conn-count" + ($("conn-drawer").hidden ? "" : " is-open"));
+  count.appendChild(connIcon("link", "conn-ic conn-ic-link"));
+  const c = elc("span", "conn-count-n"); c.textContent = String(srcs.length); count.appendChild(c);
+  count.appendChild(connIcon("chev", "conn-ic conn-chev"));
+  count.title = "Connected pages";
+  count.addEventListener("click", (e) => { e.stopPropagation(); toggleConnDrawer(); });
+  band.appendChild(count);
+}
+
+function renderConnList(n, listEl) {
+  const list = listEl || $("cd-list"); if (!list) return;
+  list.innerHTML = "";
+  const q = connQuery.trim().toLowerCase();
+  const srcs = (n.sources || []).filter((s) => !q || sourceLabel(s).toLowerCase().includes(q) || (s.url || s.key || "").toLowerCase().includes(q));
+  if (!srcs.length) {
+    const e = elc("div", "cd-empty"); e.textContent = (n.sources || []).length ? "No pages match." : "No connected pages yet."; list.appendChild(e); return;
+  }
+  srcs.forEach((s) => {
+    const rowEl = elc("div", "cd-row" + (isCurrentSource(s) ? " is-current" : ""));
+    rowEl.appendChild(faviconTile(s, "conn-fav cd-fav"));
+    const mid = elc("div", "cd-mid");
+    const top = elc("div", "cd-row-top");
+    const nm = elc("span", "cd-name"); nm.textContent = sourceLabel(s); top.appendChild(nm);
+    if (isCurrentSource(s)) { const b = elc("span", "cd-badge"); b.textContent = "Current page"; top.appendChild(b); }
+    mid.appendChild(top);
+    const urlStr = s.url || s.key || "";
+    if (/^https?:/i.test(urlStr)) {
+      const a = elc("a", "cd-url"); a.href = urlStr; a.target = "_blank"; a.rel = "noopener noreferrer";
+      const t = elc("span", "cd-url-t"); t.textContent = urlStr; a.appendChild(t);
+      a.appendChild(connIcon("ext", "conn-ic cd-url-ext")); a.title = urlStr; mid.appendChild(a);
+    } else if (urlStr) {
+      const u = elc("div", "cd-url cd-url-path"); u.textContent = urlStr; u.title = "Saved before full URLs were stored — only the page path is known."; mid.appendChild(u);
+    }
+    rowEl.appendChild(mid);
+    const rm = elc("button", "cd-rm"); rm.title = "Disconnect page";
+    const rml = elc("span", "cd-rm-lbl"); rml.textContent = "Disconnect page"; rm.appendChild(rml);
+    rm.appendChild(connIcon("x", "conn-ic cd-rm-x"));
+    rm.addEventListener("click", (e) => { e.stopPropagation(); disconnectSource(n, s); });
+    rowEl.appendChild(rm);
+    list.appendChild(rowEl);
+  });
+}
+
+function renderConnDrawer(n) {
+  const d = $("conn-drawer"); d.innerHTML = ""; if (!n) return;
+  const srcs = n.sources || [];
+
+  const head = elc("div", "cd-head");
+  const h = elc("div", "cd-title"); h.textContent = "Connected pages"; head.appendChild(h);
+  const close = elc("button", "conn-count is-open");
+  close.appendChild(connIcon("link", "conn-ic conn-ic-link"));
+  const cn = elc("span", "conn-count-n"); cn.textContent = String(srcs.length); close.appendChild(cn);
+  close.appendChild(connIcon("chev", "conn-ic conn-chev"));
+  close.addEventListener("click", (e) => { e.stopPropagation(); closeConnDrawer(); });
+  head.appendChild(close); d.appendChild(head);
+
+  const cap = elc("div", "cd-cap"); cap.textContent = "This note opens on every page below, even while unlocked."; d.appendChild(cap);
+
+  const filt = elc("div", "cd-filter");
+  filt.appendChild(connIcon("search", "conn-ic cd-search"));
+  const fi = elc("input", "cd-filter-input"); fi.type = "search"; fi.placeholder = "Filter connected pages…"; fi.value = connQuery;
+  fi.addEventListener("input", (e) => { connQuery = e.target.value; renderConnList(n); });
+  filt.appendChild(fi); d.appendChild(filt);
+
+  const list = elc("div", "cd-list"); list.id = "cd-list"; d.appendChild(list);
+  renderConnList(n, list);
+
+  const acts = elc("div", "cd-actions");
+  const connected = currentPageConnected(n);
+  const hasPage = !!(state.pageKey || state.host);
+  const b1 = elc("button", "cd-btn cd-connect" + (connected ? " is-done" : "") + (hasPage && !connected ? "" : " is-static"));
+  b1.appendChild(connIcon(connected ? "check" : "plus", "cd-btn-ic"));
+  const b1t = elc("div", "cd-btn-txt");
+  const b1l = elc("div", "cd-btn-label"); b1l.textContent = connected ? "This page is connected" : "Connect this page";
+  const b1s = elc("div", "cd-btn-sub"); b1s.textContent = hasPage ? (siteName(state.host) || state.host || "") : "No web page in view";
+  b1t.append(b1l, b1s); b1.appendChild(b1t);
+  if (hasPage && !connected) b1.addEventListener("click", () => connectCurrentPage(n));
+  else if (!hasPage) b1.classList.add("is-disabled");
+  acts.appendChild(b1);
+
+  const b2 = elc("button", "cd-btn cd-custom");
+  b2.appendChild(connIcon("globe", "cd-btn-ic"));
+  const b2t = elc("div", "cd-btn-txt");
+  const b2l = elc("div", "cd-btn-label"); b2l.textContent = "Add a custom URL";
+  const b2s = elc("div", "cd-btn-sub"); b2s.textContent = "Paste any link";
+  b2t.append(b2l, b2s); b2.appendChild(b2t);
+  b2.addEventListener("click", () => addCustomUrl(n)); acts.appendChild(b2);
+  d.appendChild(acts);
+
+  const foot = elc("div", "cd-foot"); foot.textContent = "Disconnecting a page never deletes the note. It just stops opening there."; d.appendChild(foot);
+}
+
+function connRefresh(n) { renderConn(n); if (!$("conn-drawer").hidden) renderConnDrawer(n); }
+function disconnectSource(n, s) { n.sources = (n.sources || []).filter((x) => x !== s); n.updatedAt = now(); saveNotes(); connRefresh(n); }
+function connectCurrentPage(n) { const url = state.tabInfo && state.tabInfo.url; if (!url) return; addSource(n, url); n.updatedAt = now(); saveNotes(); connRefresh(n); }
+function addCustomUrl(n) {
+  let url = (prompt("Connect this note to a page URL:") || "").trim();
+  if (!url) return;
+  if (!/^https?:\/\//i.test(url)) url = "https://" + url;
+  if (!pageKeyOf(url)) { setStatus("That doesn't look like a web URL", "error"); setTimeout(() => setStatus("Saved"), 1600); return; }
+  addSource(n, url); n.updatedAt = now(); saveNotes(); connRefresh(n);
+}
+function positionConnDrawer() {
+  const d = $("conn-drawer"), band = $("conn").getBoundingClientRect();
+  d.style.top = (band.bottom + 4) + "px";
+}
+function openConnDrawer() {
+  const n = activeNote(); if (!n) return;
+  closeAllPopovers();
+  connQuery = ""; renderConnDrawer(n);
+  $("conn-drawer").hidden = false; positionConnDrawer();
+  renderConn(n); // reflect the open chevron on the count chip
+}
+function closeConnDrawer() { $("conn-drawer").hidden = true; const n = activeNote(); if (n) renderConn(n); }
+function toggleConnDrawer() { if ($("conn-drawer").hidden) openConnDrawer(); else closeConnDrawer(); }
 
 /* ---------- range / block helpers ---------- */
 function focusEditor() { editor.focus(); ensureCssMode(); }
@@ -635,7 +813,7 @@ function buildPopovers() {
   BADGE_COLORS.forEach(([bg, fg]) => { const s = elc("div", "swatch"); s.style.background = bg; s.style.color = fg; s.textContent = "A"; s.style.display = "grid"; s.style.placeItems = "center"; s.style.fontWeight = "700"; s.style.fontSize = "12px"; s.addEventListener("mousedown", (e) => { e.preventDefault(); applyBadge(bg, fg); cp.hidden = true; }); g2.appendChild(s); });
   s2.appendChild(g2); cp.appendChild(s2);
 }
-function closeAllPopovers() { ["style-menu","color-pop","size-menu","note-info"].forEach((id) => { $(id).hidden = true; }); }
+function closeAllPopovers() { ["style-menu","color-pop","size-menu","note-info","conn-drawer"].forEach((id) => { $(id).hidden = true; }); }
 function openPopover(popId, anchor) {
   closeAllPopovers();
   const pop = $(popId); pop.hidden = false;
@@ -1115,6 +1293,10 @@ function bind() {
     const onNoteMenu = e.target.closest && (e.target.closest("#note-menu-btn") || e.target.closest("#note-menu"));
     if (!inBar) ["style-menu","color-pop","size-menu"].forEach((id) => { const p = $(id); if (!p.hidden && !p.contains(e.target)) p.hidden = true; });
     if (!$("note-info").hidden && !$("note-info").contains(e.target) && !onNoteMenu) $("note-info").hidden = true;
+    // Connected-pages drawer: dismiss on outside click, but not when the click is
+    // on its own count-chip toggle (in #conn) or the note-menu entry that opens it.
+    const onConn = e.target.closest && (e.target.closest("#conn") || e.target.closest("#conn-drawer") || e.target.closest("#note-menu"));
+    if (!$("conn-drawer").hidden && !$("conn-drawer").contains(e.target) && !onConn) closeConnDrawer();
   });
 
   chrome.storage.onChanged.addListener((changes, area) => {
