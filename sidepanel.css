@@ -315,7 +315,19 @@ body { background:var(--bg); color:var(--ink); font-family:var(--ui); font-size:
 /* ---------- title row + note menu ---------- */
 .title-row { display:flex; align-items:center; padding-right:8px; }
 .title-row .title-input { flex:1 1 auto; width:auto; }
-#note-menu { top:84px; right:8px; left:auto; }
+#note-menu { top:84px; right:8px; left:auto; min-width:236px; }
+/* Rich note-menu rows: leading icon, label, trailing accessory (count / check / Off). */
+#note-menu button { display:flex; align-items:center; gap:11px; }
+#note-menu .mi-ic { flex:none; display:inline-flex; width:16px; color:var(--muted); }
+#note-menu .mi-ic svg { width:16px; height:16px; }
+#note-menu .mi-label { flex:1 1 auto; text-align:left; }
+#note-menu .mi-trail { flex:none; display:inline-flex; align-items:center; gap:3px; font-size:11px; color:var(--faint); font-family:var(--mono); }
+#note-menu .mi-on { display:inline-flex; color:var(--accent); }
+#note-menu .mi-on svg { width:14px; height:14px; }
+#note-menu .mi-caret { color:var(--faint); font-family:var(--ui); }
+#note-menu button.fav-on .mi-ic { color:var(--accent); }
+#note-menu button.fav-on .mi-ic svg { fill:var(--accent); }
+#note-menu button.danger .mi-ic { color:var(--danger); }
 
 /* ---------- app menu (gear, root-level, overlays any view) ---------- */
 .app-menu { position:fixed; top:44px; right:10px; left:auto; z-index:80; }

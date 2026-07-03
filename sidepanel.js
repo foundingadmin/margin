@@ -256,9 +256,7 @@ function openNote(id) {
   updateChecklistCounts();
   editor.classList.toggle("numbered", !!n.numbered);
   editor.classList.toggle("show-prov", !!n.showProv);
-  $("mn-label").textContent = n.numbered ? "Hide Margin Numbers" : "Show Margin Numbers";
-  $("pin-label").textContent = n.pinned ? "Unpin note" : "Pin note";
-  syncProvMenuItem();
+  syncNoteMenu();
   $("note-menu").hidden = true;
   setStatus("Saved"); updateCounts(); syncToolbar();
   $("conn-drawer").hidden = true; renderConn(n);
@@ -298,13 +296,25 @@ async function deleteNote() {
   if (!confirm(`Delete “${n.title || "this note"}”? This can’t be undone.`)) return;
   state.notes = state.notes.filter((x) => x.id !== n.id); await saveNotes(); await ensureForActiveTab();
 }
-function togglePin() { const n = activeNote(); if (!n) return; n.pinned = !n.pinned; n.updatedAt = now(); $("pin-label").textContent = n.pinned ? "Unpin note" : "Pin note"; saveNotes(); $("note-menu").hidden = true; }
+// Favorite = the stored `pinned` field (kept for data compatibility), relabelled.
+function togglePin() { const n = activeNote(); if (!n) return; n.pinned = !n.pinned; n.updatedAt = now(); saveNotes(); $("note-menu").hidden = true; }
 function toggleMarginNumbers() {
   const n = activeNote(); if (!n) return;
   n.numbered = !n.numbered; n.updatedAt = now();
   editor.classList.toggle("numbered", n.numbered);
-  $("mn-label").textContent = n.numbered ? "Hide Margin Numbers" : "Show Margin Numbers";
   saveNotes(); $("note-menu").hidden = true;
+}
+// Refresh the note ••• menu's live accessories (source count, toggle checks, favorite state).
+function syncNoteMenu() {
+  const n = activeNote();
+  const onSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>';
+  const trail = (on) => on ? `<span class="mi-on">${onSvg}</span>` : `<span class="mi-off">Off</span>`;
+  const ct = $("conn-trail"); if (ct) ct.innerHTML = n ? `<span class="mi-count">${(n.sources || []).length}</span><span class="mi-caret">›</span>` : "";
+  const tt = $("toc-trail"); if (tt) tt.innerHTML = trail(!!(n && n.tocOn));
+  const mt = $("mn-trail"); if (mt) mt.innerHTML = trail(!!(n && n.numbered));
+  if ($("pin-label")) $("pin-label").textContent = (n && n.pinned) ? "Favorited" : "Favorite";
+  const fav = $("fav-item"); if (fav) fav.classList.toggle("fav-on", !!(n && n.pinned));
+  syncProvMenuItem();
 }
 // Paste provenance (#6): the "Show paste sources" toggle only makes sense when the note actually
 // holds pasted-from-page blocks, so show/hide the menu item by whether any data-src exists.
@@ -1303,7 +1313,7 @@ function bind() {
   const openAppMenu = (e) => { e.stopPropagation(); closeAllPopovers(); $("note-menu").hidden = true; $("app-menu").hidden = !$("app-menu").hidden; };
   $("app-menu-btn").addEventListener("click", openAppMenu);
   $("app-menu-btn-2").addEventListener("click", openAppMenu);
-  $("note-menu-btn").addEventListener("click", (e) => { e.stopPropagation(); closeAllPopovers(); $("app-menu").hidden = true; syncProvMenuItem(); $("note-menu").hidden = !$("note-menu").hidden; });
+  $("note-menu-btn").addEventListener("click", (e) => { e.stopPropagation(); closeAllPopovers(); $("app-menu").hidden = true; syncNoteMenu(); $("note-menu").hidden = !$("note-menu").hidden; });
   $("back").addEventListener("click", () => { const n = activeNote(); if (n) openNote(n.id); else ensureForActiveTab(); });
   $("info-back").addEventListener("click", () => { const n = activeNote(); if (n) openNote(n.id); else ensureForActiveTab(); });
   document.querySelectorAll("#info-seg .seg-btn").forEach((b) => b.addEventListener("click", () => { infoMode = b.dataset.tab; renderInfo(); }));
@@ -1314,7 +1324,9 @@ function bind() {
 
   $("note-menu").addEventListener("click", (e) => {
     const btn = e.target.closest("button"); if (!btn) return; $("note-menu").hidden = true;
-    ({ copy: copyNote, export: exportNote, pin: togglePin, mnumbers: toggleMarginNumbers, prov: toggleProvenance, info: showNoteInfo, delete: deleteNote }[btn.dataset.act] || (() => {}))();
+    ({ connected: openConnDrawer, toc: toggleToc, mnumbers: toggleMarginNumbers, copy: copyNote,
+       "export-md": () => exportNote("md"), "export-html": () => exportNote("html"),
+       pin: togglePin, info: showNoteInfo, prov: toggleProvenance, delete: deleteNote }[btn.dataset.act] || (() => {}))();
   });
   $("app-menu").addEventListener("click", (e) => {
     const btn = e.target.closest("button"); if (!btn) return; $("app-menu").hidden = true;
@@ -1406,11 +1418,64 @@ function bind() {
 
 /* ---------- copy / export ---------- */
 async function copyNote() { const n = activeNote(); if (!n) return; try { await navigator.clipboard.writeText(editor.innerText || ""); setStatus("Copied", "saved"); setTimeout(() => setStatus("Saved"), 1200); } catch { setStatus("Copy failed", "error"); } $("note-menu").hidden = true; }
-function exportNote() {
+// Serialize the note body's block set (headings, paragraphs, lists, checklist,
+// quote, code, divider + inline bold/italic/strike/link/code) to Markdown.
+function htmlToMarkdown(html) {
+  const root = elc("div"); root.innerHTML = html || "";
+  const inline = (node) => {
+    let out = "";
+    node.childNodes.forEach((c) => {
+      if (c.nodeType === 3) { out += c.textContent; return; }
+      if (c.nodeType !== 1) return;
+      const t = c.tagName, inner = inline(c);
+      if (t === "B" || t === "STRONG") out += `**${inner}**`;
+      else if (t === "I" || t === "EM") out += `*${inner}*`;
+      else if (t === "S" || t === "STRIKE" || t === "DEL") out += `~~${inner}~~`;
+      else if (t === "A") out += `[${inner}](${c.getAttribute("href") || ""})`;
+      else if (t === "CODE") out += `\`${inner}\``;
+      else if (t === "BR") out += "\n";
+      else out += inner; // U and any other wrapper: pass text through
+    });
+    return out;
+  };
+  const lines = [];
+  const emitList = (el, ordered) => {
+    const checklist = el.classList.contains("checklist");
+    let i = 0;
+    [...el.children].forEach((li) => {
+      if (li.tagName !== "LI") return;
+      i++;
+      const mark = checklist ? (li.classList.contains("checked") ? "- [x] " : "- [ ] ") : (ordered ? `${i}. ` : "- ");
+      lines.push(mark + inline(li).trim());
+    });
+    lines.push("");
+  };
+  [...root.children].forEach((el) => {
+    const t = el.tagName;
+    if (/^H[1-6]$/.test(t)) lines.push("#".repeat(+t[1]) + " " + inline(el).trim(), "");
+    else if (t === "P") lines.push(inline(el).trim(), "");
+    else if (t === "UL") emitList(el, false);
+    else if (t === "OL") emitList(el, true);
+    else if (t === "BLOCKQUOTE") lines.push("> " + inline(el).trim().replace(/\n/g, "\n> "), "");
+    else if (t === "PRE") lines.push("```", (el.textContent || "").replace(/\n$/, ""), "```", "");
+    else if (t === "HR") lines.push("---", "");
+    else { const s = inline(el).trim(); if (s) lines.push(s, ""); }
+  });
+  return lines.join("\n").replace(/\n{3,}/g, "\n\n").trim() + "\n";
+}
+function exportNote(fmt) {
   const n = activeNote(); if (!n) return;
-  const doc = `<!doctype html><meta charset="utf-8"><title>${(n.title || "note").replace(/[<>&]/g, "")}</title><h1>${n.title || "Untitled"}</h1>` + sanitizeHtml(n.html || "");
-  const blob = new Blob([doc], { type: "text/html" }); const url = URL.createObjectURL(blob);
-  const a = elc("a"); a.href = url; a.download = (n.title || "note").replace(/[^\w\-]+/g, "-").slice(0, 40) + ".html"; a.click();
+  const base = (n.title || "note").replace(/[^\w\-]+/g, "-").slice(0, 40) || "note";
+  let doc, mime, ext;
+  if (fmt === "md") {
+    doc = `# ${n.title || "Untitled"}\n\n` + htmlToMarkdown(sanitizeHtml(n.html || ""));
+    mime = "text/markdown"; ext = ".md";
+  } else {
+    doc = `<!doctype html><meta charset="utf-8"><title>${(n.title || "note").replace(/[<>&]/g, "")}</title><h1>${n.title || "Untitled"}</h1>` + sanitizeHtml(n.html || "");
+    mime = "text/html"; ext = ".html";
+  }
+  const blob = new Blob([doc], { type: mime }); const url = URL.createObjectURL(blob);
+  const a = elc("a"); a.href = url; a.download = base + ext; a.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000); $("note-menu").hidden = true;
 }
 
