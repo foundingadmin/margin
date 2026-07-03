@@ -73,6 +73,16 @@
            The open drawer lives in #conn-drawer below. -->
       <div id="conn" class="conn" hidden aria-label="Connected pages"></div>
 
+      <!-- Table of contents: translucent outline bar between the format bar and the
+           editor. The frosted dropdown lives in #toc-menu below. -->
+      <div id="toc-bar" class="toc-bar" hidden aria-label="Table of contents">
+        <span id="toc-num" class="toc-num"></span>
+        <span id="toc-current" class="toc-current"></span>
+        <span id="toc-pos" class="toc-pos"></span>
+        <span class="toc-chev" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></span>
+        <div class="toc-progress"><div class="toc-progress-fill"></div></div>
+      </div>
+
       <div id="editor" class="editor" contenteditable="true" spellcheck="true" aria-label="Note body"></div>
 
       <footer class="statusbar">
@@ -86,6 +96,7 @@
       <div id="color-pop" class="popover" hidden></div>
       <div id="note-info" class="popover info-pop" hidden></div>
       <div id="conn-drawer" class="conn-drawer" hidden aria-label="Connected pages"></div>
+      <div id="toc-menu" class="toc-menu" hidden aria-label="Outline"></div>
       <div id="slash" class="slash" hidden></div>
       <input id="image-input" type="file" accept="image/*" hidden />
     </section>

@@ -262,6 +262,7 @@ function openNote(id) {
   $("note-menu").hidden = true;
   setStatus("Saved"); updateCounts(); syncToolbar();
   $("conn-drawer").hidden = true; renderConn(n);
+  $("toc-menu").hidden = true; renderToc(n);
   showEditor();
 }
 function updateCounts() {
@@ -556,6 +557,88 @@ function openConnDrawer() {
 function closeConnDrawer() { $("conn-drawer").hidden = true; const n = activeNote(); if (n) renderConn(n); }
 function toggleConnDrawer() { if ($("conn-drawer").hidden) openConnDrawer(); else closeConnDrawer(); }
 
+/* ---------- Table of contents — outline bar over the editor's headings ----------
+   A per-note toggle (n.tocOn, lazily created like n.numbered) reveals a sticky
+   translucent bar above the editor. Its frosted dropdown lists the note's
+   headings (H1/H2/H3 — the editor's top-level blocks), with a scroll-progress
+   bar that hugs the bar when closed and relocates to the menu's bottom when open. */
+let tocActiveIndex = 0;
+// Top-level headings, in document order, with their level and text.
+function tocSections() {
+  if (!editor) return [];
+  return [...editor.children]
+    .filter((el) => /^H[1-3]$/.test(el.tagName))
+    .map((el) => ({ el, level: +el.tagName[1], text: (el.textContent || "").trim() || "Untitled section" }));
+}
+// A heading's scroll offset within the editor's scroll box (robust to offsetParent).
+function tocScrollTop(el) { return el.getBoundingClientRect().top - editor.getBoundingClientRect().top + editor.scrollTop; }
+function renderToc(n) {
+  const bar = $("toc-bar");
+  if (!n || !isEditorView() || !n.tocOn) { bar.hidden = true; $("toc-menu").hidden = true; bar.classList.remove("menu-open"); return; }
+  bar.hidden = false;
+  updateTocState();
+}
+function updateTocState() {
+  const n = activeNote(); if (!n || !n.tocOn || $("toc-bar").hidden) return;
+  const secs = tocSections(), total = secs.length, th = 46;
+  let active = 0;
+  for (let i = 0; i < secs.length; i++) { if (tocScrollTop(secs[i].el) - editor.scrollTop <= th) active = i; }
+  tocActiveIndex = active;
+  const cur = secs[active];
+  const numEl = $("toc-num");
+  numEl.textContent = n.numbered && total ? String(active + 1) : "";
+  numEl.style.display = n.numbered && total ? "" : "none";
+  $("toc-current").textContent = total ? (cur ? cur.text : "") : "No headings yet";
+  $("toc-pos").textContent = total ? `${active + 1}/${total}` : "";
+  const max = editor.scrollHeight - editor.clientHeight;
+  const prog = max > 0 ? (editor.scrollTop / max) * 100 : 0;
+  document.querySelectorAll(".toc-progress-fill").forEach((f) => { f.style.width = prog.toFixed(1) + "%"; });
+  // keep the open menu's active-row highlight in sync while scrolling
+  if (!$("toc-menu").hidden) {
+    const rows = $("toc-menu").querySelectorAll(".toc-row");
+    rows.forEach((r, i) => r.classList.toggle("is-active", i === active));
+  }
+}
+function renderTocMenu(n) {
+  const menu = $("toc-menu"); menu.innerHTML = "";
+  const secs = tocSections();
+  const scroll = elc("div", "toc-scroll");
+  if (!secs.length) { const e = elc("div", "toc-empty"); e.textContent = "No headings in this note yet."; scroll.appendChild(e); }
+  secs.forEach((s, i) => {
+    const row = elc("button", "toc-row lvl" + s.level + (i === tocActiveIndex ? " is-active" : ""));
+    if (n.numbered) { const num = elc("span", "toc-rownum"); num.textContent = String(i + 1); row.appendChild(num); }
+    const t = elc("span", "toc-rowtitle"); t.textContent = s.text; row.appendChild(t);
+    row.addEventListener("click", () => tocJump(i));
+    scroll.appendChild(row);
+  });
+  menu.appendChild(scroll);
+  const prog = elc("div", "toc-progress toc-menu-progress"); prog.innerHTML = '<div class="toc-progress-fill"></div>';
+  menu.appendChild(prog);
+}
+function positionTocMenu() { $("toc-menu").style.top = $("toc-bar").getBoundingClientRect().bottom + "px"; }
+function openTocMenu() {
+  const n = activeNote(); if (!n || !n.tocOn) return;
+  closeAllPopovers();
+  renderTocMenu(n);
+  $("toc-menu").hidden = false; $("toc-bar").classList.add("menu-open");
+  positionTocMenu(); updateTocState();
+}
+function closeTocMenu() { $("toc-menu").hidden = true; $("toc-bar").classList.remove("menu-open"); updateTocState(); }
+function toggleTocMenu() { if ($("toc-menu").hidden) openTocMenu(); else closeTocMenu(); }
+function tocJump(i) {
+  const s = tocSections()[i]; if (!s) return;
+  editor.scrollTo({ top: Math.max(0, tocScrollTop(s.el) - 12), behavior: "smooth" });
+  closeTocMenu();
+}
+// The on/off toggle (wired from the note ••• menu).
+function toggleToc() {
+  const n = activeNote(); if (!n) return;
+  n.tocOn = !n.tocOn; n.updatedAt = now(); saveNotes();
+  if (!n.tocOn) closeTocMenu();
+  renderToc(n);
+  $("note-menu").hidden = true;
+}
+
 /* ---------- range / block helpers ---------- */
 function focusEditor() { editor.focus(); ensureCssMode(); }
 function currentBlock() {
@@ -813,7 +896,7 @@ function buildPopovers() {
   BADGE_COLORS.forEach(([bg, fg]) => { const s = elc("div", "swatch"); s.style.background = bg; s.style.color = fg; s.textContent = "A"; s.style.display = "grid"; s.style.placeItems = "center"; s.style.fontWeight = "700"; s.style.fontSize = "12px"; s.addEventListener("mousedown", (e) => { e.preventDefault(); applyBadge(bg, fg); cp.hidden = true; }); g2.appendChild(s); });
   s2.appendChild(g2); cp.appendChild(s2);
 }
-function closeAllPopovers() { ["style-menu","color-pop","size-menu","note-info","conn-drawer"].forEach((id) => { $(id).hidden = true; }); }
+function closeAllPopovers() { ["style-menu","color-pop","size-menu","note-info","conn-drawer","toc-menu"].forEach((id) => { $(id).hidden = true; }); $("toc-bar").classList.remove("menu-open"); }
 function openPopover(popId, anchor) {
   closeAllPopovers();
   const pop = $(popId); pop.hidden = false;
@@ -1280,6 +1363,11 @@ function bind() {
   document.addEventListener("selectionchange", () => { if (document.activeElement === editor) { syncToolbar(); saveCaptureCaret(); updateCounts(); } });
   document.addEventListener("keydown", onKeydown);
 
+  // Table of contents: track scroll for the progress bar + active section; the bar toggles its menu.
+  let tocRaf = 0;
+  editor.addEventListener("scroll", () => { if ($("toc-bar").hidden) return; if (tocRaf) return; tocRaf = requestAnimationFrame(() => { tocRaf = 0; updateTocState(); }); });
+  $("toc-bar").addEventListener("click", (e) => { e.stopPropagation(); toggleTocMenu(); });
+
   document.addEventListener("click", (e) => {
     const onApp = e.target.closest && (e.target.closest("#app-menu-btn") || e.target.closest("#app-menu-btn-2"));
     const onNote = e.target.closest && e.target.closest("#note-menu-btn");
@@ -1297,6 +1385,9 @@ function bind() {
     // on its own count-chip toggle (in #conn) or the note-menu entry that opens it.
     const onConn = e.target.closest && (e.target.closest("#conn") || e.target.closest("#conn-drawer") || e.target.closest("#note-menu"));
     if (!$("conn-drawer").hidden && !$("conn-drawer").contains(e.target) && !onConn) closeConnDrawer();
+    // TOC dropdown: dismiss on outside click, but not on its own bar toggle.
+    const onToc = e.target.closest && (e.target.closest("#toc-bar") || e.target.closest("#toc-menu"));
+    if (!$("toc-menu").hidden && !$("toc-menu").contains(e.target) && !onToc) closeTocMenu();
   });
 
   chrome.storage.onChanged.addListener((changes, area) => {
