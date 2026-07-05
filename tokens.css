@@ -42,8 +42,9 @@
   /* accent + states — slate-blue = app/chrome only */
   --accent:#4a6d9c; --accent-soft:#e8eef6; --on-accent:#ffffff;
   --danger:#c0392b;
-  /* positive/success (save-state check, etc.); darkened for AA on the light plane */
-  --ok:#2f9e63;
+  /* positive/success (save-state check, etc.); darkened for AA on the light plane.
+     Kept as an alias of --status-positive so older references still resolve. */
+  --ok:#3f9c6a;
   /* elevation + shape */
   --shadow:0 18px 42px -16px rgba(20,24,31,.28);
   --radius:12px; --radius-sm:8px;
@@ -53,6 +54,22 @@
   /* Margin Numbers gutter — accent-tinted zebra band + faint rail */
   --mn-tint:rgba(74,109,156,.06);
   --mn-rail:rgba(74,109,156,.16);
+
+  /* --- surfaces the newer editor bands read (added with the Azure build-out) --- */
+  --surface-menu:#f4f6f9;      /* flyout menus (gear/note/size/style/color)   */
+  --surface-inset:#e9edf3;     /* recessed list inset inside the drawer        */
+  --surface-toc:rgba(240,243,247,.82); /* TOC intermediary translucent bar     */
+  --menu-border:#d4dbe4;
+
+  /* --- 6-color status palette (ink + badge). Exactly six, no more. --- */
+  --status-positive:#3f9c6a; --status-alert:#b98b1e; --status-warning:#c26a2e;
+  --status-negative:#c0392b; --status-information:#6a5cd0; --status-new:#c05070;
+  --ink-reset:#1c2530;         /* "Reset text color" returns ink to neutral     */
+
+  /* --- motion + focus (tokenized so CC reads the curve, never re-types it) --- */
+  --drawer-ease:cubic-bezier(.22,1,.36,1);
+  --drawer-open:480px; --drawer-closed:50px;
+  --focus:#4a6d9c;             /* :focus-visible ring — WCAG requirement         */
 }
 
 .dark {
@@ -67,6 +84,20 @@
   --shadow:0 22px 48px -14px rgba(0,0,0,.7);
   --mn-tint:rgba(124,158,212,.06);
   --mn-rail:rgba(124,158,212,.13);
+
+  /* newer editor bands (dark) */
+  --surface-menu:#242b37;
+  --surface-inset:#12161c;
+  --surface-toc:rgba(26,31,40,.82);
+  --menu-border:#36404d;
+
+  /* 6-color status palette (dark ink/badge values) */
+  --status-positive:#62c08a; --status-alert:#e5c558; --status-warning:#e08a4e;
+  --status-negative:#e5707a; --status-information:#9a8cf0; --status-new:#e5849e;
+  --ink-reset:#e5e9ef;
+
+  /* motion + focus (dark) */
+  --focus:#a0b4d2;
 }
 
 /* ---------------------------------------------------------------------------

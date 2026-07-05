@@ -132,20 +132,16 @@ async function saveNotes() {
 }
 async function saveSettings() { await chrome.storage.local.set({ [SETTINGS_KEY]: state.settings }); }
 
-/* ---------- theme (binary) ---------- */
-const ICON = {
-  lockClosed: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>',
-  lockOpen: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 7.4-1.7"/></svg>',
-  sun: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>',
-  moon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>',
-  home: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-8 9 8"/><path d="M5 10v9a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-9"/></svg>',
-  gear: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>'
-};
+/* ---------- theme + toggles (icons are Lucide <use> refs, swapped by id) ----------
+   The topbar icons live in sidepanel.html as inline <use href="#i-*"> sprites, so
+   the two state-driven buttons (lock, theme) just repoint their <use> at another
+   symbol rather than re-injecting SVG markup. */
+function setUse(btn, id) { const u = btn && btn.querySelector("use"); if (u) u.setAttribute("href", "#i-" + id); }
 function applyTheme() {
   const dark = state.settings.theme === "dark";
   document.body.classList.toggle("dark", dark);
   const tb = $("theme-toggle");
-  tb.innerHTML = dark ? ICON.moon : ICON.sun;
+  setUse(tb, dark ? "moon" : "sun");
   tb.classList.toggle("on", dark);
   tb.title = dark ? "Dark mode (click for light)" : "Light mode (click for dark)";
 }
@@ -153,7 +149,7 @@ function toggleTheme() { state.settings.theme = state.settings.theme === "dark" 
 function applyLockIcon() {
   const following = !!state.settings.follow; // follow=true => note changes per tab => UNLOCKED
   const b = $("lock-toggle");
-  b.innerHTML = following ? ICON.lockOpen : ICON.lockClosed;
+  setUse(b, following ? "lock-open" : "lock");
   b.classList.toggle("on", !following); // locked (stays put) is the engaged/accent state
   b.title = following
     ? "Unlocked — the note follows the active tab, switching per site. Click to lock it in place."
@@ -228,21 +224,16 @@ async function showBrowser() {
 /* ---------- editor core ---------- */
 let saveTimer = null, cssModeSet = false;
 // Save state is never color-alone (brand AA): every state pairs a glyph with a
-// label. saving = pulsing dot, saved = check, error = ×. Legacy callers pass
-// `true` for the saving flag; that still maps to the "saving" state.
-const SAVE_ICON = {
-  saved: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>',
-  error: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>',
-};
+// label. saving = pulsing dot, saved = check, error = ×. The three glyphs are
+// static in sidepanel.html; CSS reveals the one matching [data-state], so here we
+// only flip data-state + the label. Legacy callers pass `true` for the saving flag.
 const SAVE_TITLE = { saved: "All changes saved", saving: "Saving…", error: "Couldn't save to local storage" };
 function setStatus(t, state) {
   const el = $("save-status"); if (!el) return;
   const s = state === true ? "saving" : (state || "saved");
   el.dataset.state = s;
   el.title = SAVE_TITLE[s] || "";
-  el.innerHTML = (s === "saving" ? '<span class="save-dot" aria-hidden="true"></span>' : SAVE_ICON[s] || "") +
-    '<span class="save-label"></span>';
-  el.lastChild.textContent = t;
+  const lbl = $("save-label"); if (lbl) lbl.textContent = t;
 }
 function activeNote() { return state.notes.find((x) => x.id === state.activeId); }
 function ensureCssMode() { if (!cssModeSet) { try { document.execCommand("styleWithCSS", false, true); } catch (e) {} cssModeSet = true; } }
@@ -260,17 +251,16 @@ function openNote(id) {
   $("note-menu").hidden = true;
   renderNoteSub(n); syncMnToggle(n);
   setStatus("Saved"); updateCounts(); syncToolbar();
-  $("conn-drawer").hidden = true; renderConn(n);
-  $("toc-menu").hidden = true; renderToc(n);
-  showEditor();
+  showEditor(); // activate the editor view first so the band/TOC renders (they gate on isEditorView)
+  closeConnDrawer(); renderConn(n);
+  closeTocMenu(); renderToc(n);
 }
 // Compact "Jun 24" for the created stamp (relTime gives the fuzzy "edited" half).
 function fmtShortDate(ts) { return ts ? new Date(ts).toLocaleDateString(undefined, { month: "short", day: "numeric" }) : ""; }
-// The provenance line under the title: when the note was created and last edited.
+// The created/edited line under the title: when the note was created and last edited.
 function renderNoteSub(n) {
-  const el = $("note-sub"); if (!el) return;
-  if (!n) { el.textContent = ""; return; }
-  el.textContent = `Created ${fmtShortDate(n.createdAt)} · Edited ${relTime(n.updatedAt)}`;
+  const el = $("created-line"); if (!el) return;
+  el.textContent = n ? `Created ${fmtShortDate(n.createdAt)} · Edited ${relTime(n.updatedAt)}` : "Created — · Edited —";
 }
 // Footer "#" quick-toggle mirrors the note's Margin Numbers state.
 function syncMnToggle(n) {
@@ -325,90 +315,16 @@ function toggleMarginNumbers() {
   syncMnToggle(n); syncNoteMenu();
   saveNotes(); $("note-menu").hidden = true;
 }
-// Refresh the note ••• menu's live accessories (source count, toggle checks, favorite state).
+// Refresh the note kebab menu's live accessories (source count, toggle state, favorite).
+// LOCKED SET: connected · toc · margin numbers · copy · download · favorite · delete.
 function syncNoteMenu() {
   const n = activeNote();
-  const onSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>';
-  const trail = (on) => on ? `<span class="mi-on">${onSvg}</span>` : `<span class="mi-off">Off</span>`;
-  const ct = $("conn-trail"); if (ct) ct.innerHTML = n ? `<span class="mi-count">${(n.sources || []).length}</span><span class="mi-caret">›</span>` : "";
-  const tt = $("toc-trail"); if (tt) tt.innerHTML = trail(!!(n && n.tocOn));
-  const mt = $("mn-trail"); if (mt) mt.innerHTML = trail(!!(n && n.numbered));
-  if ($("pin-label")) $("pin-label").textContent = (n && n.pinned) ? "Favorited" : "Favorite";
-  const fav = $("fav-item"); if (fav) fav.classList.toggle("fav-on", !!(n && n.pinned));
-  syncProvMenuItem();
-}
-// Paste provenance (#6): the "Show paste sources" toggle only makes sense when the note actually
-// holds pasted-from-page blocks, so show/hide the menu item by whether any data-src exists.
-function noteHasProv(n) { return !!n && /\sdata-src=/.test(n.html || ""); }
-function syncProvMenuItem() {
-  const n = activeNote();
-  const item = $("prov-item"); if (!item) return;
-  item.hidden = !noteHasProv(n);
-  $("prov-label").textContent = (n && n.showProv) ? "Hide paste sources" : "Show paste sources";
-}
-function toggleProvenance() {
-  const n = activeNote(); if (!n) return;
-  n.showProv = !n.showProv; n.updatedAt = now();
-  editor.classList.toggle("show-prov", n.showProv);
-  $("prov-label").textContent = n.showProv ? "Hide paste sources" : "Show paste sources";
-  saveNotes(); $("note-menu").hidden = true;
-}
-// Absolute "Jun 29, 2026 · 3:04 PM" stamp for the Note info panel (relTime gives the fuzzy half).
-function fmtStamp(ts) {
-  if (!ts) return "—";
-  return new Date(ts).toLocaleString(undefined, { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" });
-}
-// Note info (#2): surface the note's source URL(s), created and updated — all data the
-// sources[] model already stores. Full URLs are kept on every note but shown only here, on demand.
-function showNoteInfo() {
-  const n = activeNote(); if (!n) return;
-  const pop = $("note-info"); pop.innerHTML = "";
-
-  const srcs = n.sources || [];
-  const ss = elc("div", "pop-section");
-  const lbl = elc("div", "pop-label");
-  lbl.textContent = srcs.length > 1 ? `Sources · ${srcs.length}` : "Source";
-  ss.appendChild(lbl);
-  if (!srcs.length) {
-    const e = elc("div", "info-empty"); e.textContent = "Not linked to a page — a scratch note.";
-    ss.appendChild(e);
-  } else {
-    const list = elc("div", "info-srcs");
-    srcs.forEach((s) => {
-      const row = elc("div", "info-src");
-      if (/^https?:/i.test(s.url || "")) {
-        const a = elc("a", "info-src-link");
-        a.href = s.url; a.target = "_blank"; a.rel = "noopener noreferrer";
-        a.textContent = s.url; a.title = s.url;
-        row.appendChild(a);
-      } else {
-        // Pre-sources[] notes never stored a full URL — only the page path is known.
-        const p = elc("div", "info-src-path");
-        p.textContent = s.url || s.key || "Unknown page";
-        p.title = "Saved before full URLs were stored — only the page path is known.";
-        row.appendChild(p);
-      }
-      list.appendChild(row);
-    });
-    ss.appendChild(list);
-  }
-  pop.appendChild(ss);
-
-  const ms = elc("div", "pop-section");
-  const mlbl = elc("div", "pop-label"); mlbl.textContent = "Details"; ms.appendChild(mlbl);
-  const meta = elc("div", "info-meta");
-  const infoRow = (k, v) => {
-    const row = elc("div", "info-row");
-    const ke = elc("span", "info-k"); ke.textContent = k;
-    const ve = elc("span", "info-v"); ve.textContent = v;
-    row.append(ke, ve); meta.appendChild(row);
-  };
-  infoRow("Created", fmtStamp(n.createdAt));
-  infoRow("Updated", `${fmtStamp(n.updatedAt)} · ${relTime(n.updatedAt)}`);
-  ms.appendChild(meta);
-  pop.appendChild(ms);
-
-  openPopover("note-info", $("note-menu-btn"));
+  const cc = $("note-conn-count"); if (cc) cc.textContent = `${n ? (n.sources || []).length : 0} ›`;
+  const ts = $("toc-state"); if (ts) ts.textContent = tocIsOn(n) ? "On" : "Off";
+  const ms = $("mn-state"); if (ms) ms.textContent = (n && n.numbered) ? "On" : "Off";
+  const fl = $("fav-label"); if (fl) fl.textContent = (n && n.pinned) ? "Favorited" : "Favorite";
+  const menu = $("note-menu");
+  const fav = menu && menu.querySelector('[data-act="favorite"]'); if (fav) fav.classList.toggle("fav-on", !!(n && n.pinned));
 }
 
 /* ---------- Connected pages — the sources[] set, made visible & editable ----------
@@ -417,16 +333,9 @@ function showNoteInfo() {
    pages. The read model already exists; the drawer adds connect / disconnect /
    add-custom-URL mutations. Favicons aren't fetched (no host permission), so each
    page shows a colored initial tile derived deterministically from its host. */
-const CONN_ICON = {
-  link:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>',
-  chev:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>',
-  search:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>',
-  ext:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>',
-  x:     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>',
-  plus:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>',
-  check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>',
-  globe: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2a15 15 0 0 1 4 10 15 15 0 0 1-4 10 15 15 0 0 1-4-10 15 15 0 0 1 4-10z"/><path d="M2 12h20"/></svg>',
-};
+// Inline Lucide icon from the #i-* sprite, wrapped in a span for flex layout.
+// Every icon in the app is a sprite <use>; no literal glyph characters live here.
+function svgUse(id, cls) { const s = elc("span", cls || ""); s.innerHTML = `<svg viewBox="0 0 24 24"><use href="#i-${id}"/></svg>`; return s; }
 let connQuery = "";
 // Known-host brand tints, so recognizable sites (Linear, Claude, GitHub…) read
 // as themselves in the favicon chip; anything unlisted falls back to the
@@ -476,123 +385,91 @@ function currentPageConnected(n) {
   if (state.host) return src.some((s) => s.host === state.host);
   return false;
 }
-function connIcon(name, cls) { const e = elc("span", cls || "conn-ic"); e.innerHTML = CONN_ICON[name] || ""; return e; }
 function faviconTile(s, cls) {
   const t = elc("span", cls || "conn-fav");
   t.style.background = sourceColor(s.host); t.textContent = sourceInitial(s.host);
   return t;
 }
+function connIsOpen() { const b = $("connected-band"); return !!b && b.dataset.open === "true"; }
 
-// Always-visible band: horizontal favicon chip row + pinned count chip.
+// Collapsed band: horizontal favicon name-chip row + pinned count chip. The band
+// is its own in-flow horizontal band (A1) that stays put when the TOC toggles (A2).
 function renderConn(n) {
-  const band = $("conn"); band.innerHTML = "";
+  const band = $("connected-band"); if (!band) return;
   if (!n || !isEditorView()) { band.hidden = true; return; }
   band.hidden = false;
   const srcs = n.sources || [];
 
-  const row = elc("div", "conn-row");
-  srcs.forEach((s) => {
-    const chip = elc("button", "conn-chip" + (isCurrentSource(s) ? " is-current" : ""));
-    chip.appendChild(faviconTile(s));
-    const nm = elc("span", "conn-chip-name"); nm.textContent = sourceLabel(s); chip.appendChild(nm);
-    if (/^https?:/i.test(s.url || "")) { chip.title = s.url; chip.addEventListener("click", () => chrome.tabs.create({ url: s.url })); }
-    row.appendChild(chip);
-  });
-  band.appendChild(row);
-
-  const count = elc("button", "conn-count" + ($("conn-drawer").hidden ? "" : " is-open"));
-  count.appendChild(connIcon("link", "conn-ic conn-ic-link"));
-  const c = elc("span", "conn-count-n"); c.textContent = String(srcs.length); count.appendChild(c);
-  count.appendChild(connIcon("chev", "conn-ic conn-chev"));
-  count.title = "Connected pages";
-  count.addEventListener("click", (e) => { e.stopPropagation(); toggleConnDrawer(); });
-  band.appendChild(count);
+  const chips = $("connected-chips"); if (chips) {
+    chips.innerHTML = "";
+    srcs.forEach((s) => {
+      const chip = elc("button", "conn-chip" + (isCurrentSource(s) ? " is-active" : ""));
+      chip.setAttribute("role", "listitem");
+      chip.appendChild(faviconTile(s));
+      const nm = elc("span", "conn-chip-name"); nm.textContent = sourceLabel(s); chip.appendChild(nm);
+      if (/^https?:/i.test(s.url || "")) { chip.title = s.url; chip.addEventListener("click", () => chrome.tabs.create({ url: s.url })); }
+      chips.appendChild(chip);
+    });
+  }
+  const cnt = String(srcs.length);
+  const c1 = $("connected-count"); if (c1) c1.textContent = cnt;
+  const c2 = $("connected-count-2"); if (c2) c2.textContent = cnt;
+  const open = connIsOpen();
+  const tgl = $("connected-toggle"); if (tgl) tgl.setAttribute("aria-expanded", String(open));
+  if (open) { renderConnList(n); syncConnActions(n); }
 }
 
-function renderConnList(n, listEl) {
-  const list = listEl || $("cd-list"); if (!list) return;
+// Drawer rows: 34×34 favicon, name + Current-page pill, mono URL, hover-reveal disconnect.
+function renderConnList(n) {
+  const list = $("connected-list"); if (!list) return;
   list.innerHTML = "";
   const q = connQuery.trim().toLowerCase();
   const srcs = (n.sources || []).filter((s) => !q || sourceLabel(s).toLowerCase().includes(q) || (s.url || s.key || "").toLowerCase().includes(q));
   if (!srcs.length) {
-    const e = elc("div", "cd-empty"); e.textContent = (n.sources || []).length ? "No pages match." : "No connected pages yet."; list.appendChild(e); return;
+    const e = elc("li", "conn-empty"); e.textContent = (n.sources || []).length ? "No pages match." : "No connected pages yet."; list.appendChild(e); return;
   }
   srcs.forEach((s) => {
-    const rowEl = elc("div", "cd-row" + (isCurrentSource(s) ? " is-current" : ""));
-    rowEl.appendChild(faviconTile(s, "conn-fav cd-fav"));
-    const mid = elc("div", "cd-mid");
-    const top = elc("div", "cd-row-top");
-    const nm = elc("span", "cd-name"); nm.textContent = sourceLabel(s); top.appendChild(nm);
-    if (isCurrentSource(s)) { const b = elc("span", "cd-badge"); b.textContent = "Current page"; top.appendChild(b); }
+    const rowEl = elc("li", "conn-row" + (isCurrentSource(s) ? " is-current" : ""));
+    rowEl.appendChild(faviconTile(s, "conn-row-fav"));
+    const mid = elc("div", "conn-row-mid");
+    const top = elc("div", "conn-row-top");
+    const nm = elc("span", "conn-row-name"); nm.textContent = sourceLabel(s); top.appendChild(nm);
+    if (isCurrentSource(s)) { const b = elc("span", "conn-row-pill"); b.textContent = "Current page"; top.appendChild(b); }
     mid.appendChild(top);
     const urlStr = s.url || s.key || "";
     if (/^https?:/i.test(urlStr)) {
-      const a = elc("a", "cd-url"); a.href = urlStr; a.target = "_blank"; a.rel = "noopener noreferrer";
-      const t = elc("span", "cd-url-t"); t.textContent = urlStr; a.appendChild(t);
-      a.appendChild(connIcon("ext", "conn-ic cd-url-ext")); a.title = urlStr; mid.appendChild(a);
+      const a = elc("a", "conn-row-url"); a.href = urlStr; a.target = "_blank"; a.rel = "noopener noreferrer";
+      const t = elc("span", "conn-row-url-t"); t.textContent = urlStr; a.appendChild(t);
+      a.appendChild(svgUse("external-link", "conn-row-ext")); a.title = urlStr; mid.appendChild(a);
     } else if (urlStr) {
-      const u = elc("div", "cd-url cd-url-path"); u.textContent = urlStr; u.title = "Saved before full URLs were stored — only the page path is known."; mid.appendChild(u);
+      const u = elc("div", "conn-row-url conn-row-url-path"); u.textContent = urlStr; u.title = "Saved before full URLs were stored — only the page path is known."; mid.appendChild(u);
     }
     rowEl.appendChild(mid);
-    const rm = elc("button", "cd-rm"); rm.title = "Disconnect page";
-    const rml = elc("span", "cd-rm-lbl"); rml.textContent = "Disconnect page"; rm.appendChild(rml);
-    rm.appendChild(connIcon("x", "conn-ic cd-rm-x"));
+    const rm = elc("button", "conn-row-rm"); rm.title = "Disconnect page";
+    const rml = elc("span", "conn-row-rm-lbl"); rml.textContent = "Disconnect page"; rm.appendChild(rml);
+    rm.appendChild(svgUse("x", "conn-row-rm-x"));
     rm.addEventListener("click", (e) => { e.stopPropagation(); disconnectSource(n, s); });
     rowEl.appendChild(rm);
     list.appendChild(rowEl);
   });
 }
 
-function renderConnDrawer(n) {
-  const d = $("conn-drawer"); d.innerHTML = ""; if (!n) return;
-  const srcs = n.sources || [];
-
-  const head = elc("div", "cd-head");
-  const h = elc("div", "cd-title"); h.textContent = "Connected pages"; head.appendChild(h);
-  const close = elc("button", "conn-count is-open");
-  close.appendChild(connIcon("link", "conn-ic conn-ic-link"));
-  const cn = elc("span", "conn-count-n"); cn.textContent = String(srcs.length); close.appendChild(cn);
-  close.appendChild(connIcon("chev", "conn-ic conn-chev"));
-  close.addEventListener("click", (e) => { e.stopPropagation(); closeConnDrawer(); });
-  head.appendChild(close); d.appendChild(head);
-
-  const cap = elc("div", "cd-cap"); cap.textContent = "This note opens on every page below, even while unlocked."; d.appendChild(cap);
-
-  const filt = elc("div", "cd-filter");
-  filt.appendChild(connIcon("search", "conn-ic cd-search"));
-  const fi = elc("input", "cd-filter-input"); fi.type = "search"; fi.placeholder = "Filter connected pages…"; fi.value = connQuery;
-  fi.addEventListener("input", (e) => { connQuery = e.target.value; renderConnList(n); });
-  filt.appendChild(fi); d.appendChild(filt);
-
-  const list = elc("div", "cd-list"); list.id = "cd-list"; d.appendChild(list);
-  renderConnList(n, list);
-
-  const acts = elc("div", "cd-actions");
+// The two action buttons are static in sidepanel.html; JS only reflects state.
+function syncConnActions(n) {
   const connected = currentPageConnected(n);
   const hasPage = !!(state.pageKey || state.host);
-  const b1 = elc("button", "cd-btn cd-connect" + (connected ? " is-done" : "") + (hasPage && !connected ? "" : " is-static"));
-  b1.appendChild(connIcon(connected ? "check" : "plus", "cd-btn-ic"));
-  const b1t = elc("div", "cd-btn-txt");
-  const b1l = elc("div", "cd-btn-label"); b1l.textContent = connected ? "This page is connected" : "Connect this page";
-  const b1s = elc("div", "cd-btn-sub"); b1s.textContent = hasPage ? (siteName(state.host) || state.host || "") : "No web page in view";
-  b1t.append(b1l, b1s); b1.appendChild(b1t);
-  if (hasPage && !connected) b1.addEventListener("click", () => connectCurrentPage(n));
-  else if (!hasPage) b1.classList.add("is-disabled");
-  acts.appendChild(b1);
-
-  const b2 = elc("button", "cd-btn cd-custom");
-  b2.appendChild(connIcon("globe", "cd-btn-ic"));
-  const b2t = elc("div", "cd-btn-txt");
-  const b2l = elc("div", "cd-btn-label"); b2l.textContent = "Add a custom URL";
-  const b2s = elc("div", "cd-btn-sub"); b2s.textContent = "Paste any link";
-  b2t.append(b2l, b2s); b2.appendChild(b2t);
-  b2.addEventListener("click", () => addCustomUrl(n)); acts.appendChild(b2);
-  d.appendChild(acts);
-
-  const foot = elc("div", "cd-foot"); foot.textContent = "Disconnecting a page never deletes the note. It just stops opening there."; d.appendChild(foot);
+  const cc = $("connect-current");
+  if (cc) {
+    const title = cc.querySelector(".da-title"), url = cc.querySelector(".da-url"), ic = cc.querySelector(".da-ic use");
+    if (title) title.textContent = connected ? "This page is connected" : "Connect this page";
+    if (url) url.textContent = hasPage ? (connected ? "Already connected" : (siteName(state.host) || state.host || "current tab")) : "No web page in view";
+    if (ic) ic.setAttribute("href", connected ? "#i-check" : "#i-plus");
+    cc.classList.toggle("is-done", connected);
+    cc.disabled = !hasPage || connected;
+  }
 }
 
-function connRefresh(n) { renderConn(n); if (!$("conn-drawer").hidden) renderConnDrawer(n); }
+function connRefresh(n) { renderConn(n); if (connIsOpen()) { renderConnList(n); syncConnActions(n); } }
 function disconnectSource(n, s) { n.sources = (n.sources || []).filter((x) => x !== s); n.updatedAt = now(); saveNotes(); connRefresh(n); }
 function connectCurrentPage(n) { const url = state.tabInfo && state.tabInfo.url; if (!url) return; addSource(n, url); n.updatedAt = now(); saveNotes(); connRefresh(n); }
 function addCustomUrl(n) {
@@ -602,19 +479,25 @@ function addCustomUrl(n) {
   if (!pageKeyOf(url)) { setStatus("That doesn't look like a web URL", "error"); setTimeout(() => setStatus("Saved"), 1600); return; }
   addSource(n, url); n.updatedAt = now(); saveNotes(); connRefresh(n);
 }
-function positionConnDrawer() {
-  const d = $("conn-drawer"), band = $("conn").getBoundingClientRect();
-  d.style.top = (band.bottom + 4) + "px";
-}
+// Open = animate the band's height (CSS reads data-open → --drawer-open) with the
+// drawer content fading in; the collapsed chip row is swapped for the drawer body.
 function openConnDrawer() {
   const n = activeNote(); if (!n) return;
   closeAllPopovers();
-  connQuery = ""; renderConnDrawer(n);
-  $("conn-drawer").hidden = false; positionConnDrawer();
-  renderConn(n); // reflect the open chevron on the count chip
+  connQuery = ""; const f = $("connected-filter"); if (f) f.value = "";
+  const band = $("connected-band"); if (!band) return;
+  const d = $("connected-drawer"); if (d) d.hidden = false;
+  band.dataset.open = "true";
+  renderConnList(n); syncConnActions(n); renderConn(n);
 }
-function closeConnDrawer() { $("conn-drawer").hidden = true; const n = activeNote(); if (n) renderConn(n); }
-function toggleConnDrawer() { if ($("conn-drawer").hidden) openConnDrawer(); else closeConnDrawer(); }
+function closeConnDrawer() {
+  const band = $("connected-band"); if (!band) return;
+  band.dataset.open = "false";
+  const d = $("connected-drawer"); if (d) d.hidden = true;
+  const tgl = $("connected-toggle"); if (tgl) tgl.setAttribute("aria-expanded", "false");
+  const n = activeNote(); if (n && isEditorView()) renderConn(n);
+}
+function toggleConnDrawer() { if (connIsOpen()) closeConnDrawer(); else openConnDrawer(); }
 
 /* ---------- Table of contents — outline bar over the editor's headings ----------
    A per-note toggle (n.tocOn, lazily created like n.numbered) reveals a sticky
@@ -622,77 +505,86 @@ function toggleConnDrawer() { if ($("conn-drawer").hidden) openConnDrawer(); els
    headings (H1/H2/H3 — the editor's top-level blocks), with a scroll-progress
    bar that hugs the bar when closed and relocates to the menu's bottom when open. */
 let tocActiveIndex = 0;
-// Top-level headings, in document order, with their level and text.
+// TOC is on by default; the note actions menu toggle can switch it off per-note.
+function tocIsOn(n) { return !!n && n.tocOn !== false; }
+// B1: build the outline from the editor's REAL heading nodes (H1/H2), queried live
+// each call, so a freshly-typed heading appears without reload. Falls back to
+// "No headings yet" only when zero headings exist.
 function tocSections() {
   if (!editor) return [];
-  return [...editor.children]
-    .filter((el) => /^H[1-3]$/.test(el.tagName))
+  return [...editor.querySelectorAll("h1, h2")]
     .map((el) => ({ el, level: +el.tagName[1], text: (el.textContent || "").trim() || "Untitled section" }));
 }
 // A heading's scroll offset within the editor's scroll box (robust to offsetParent).
 function tocScrollTop(el) { return el.getBoundingClientRect().top - editor.getBoundingClientRect().top + editor.scrollTop; }
+function tocMenuIsOpen() { const m = $("toc-menu"); return !!m && !m.hidden; }
 function renderToc(n) {
-  const bar = $("toc-bar");
-  if (!n || !isEditorView() || !n.tocOn) { bar.hidden = true; $("toc-menu").hidden = true; bar.classList.remove("menu-open"); return; }
+  const bar = $("toc-bar"); if (!bar) return;
+  if (!n || !isEditorView() || !tocIsOn(n)) { bar.hidden = true; closeTocMenu(); return; }
   bar.hidden = false;
   updateTocState();
 }
 function updateTocState() {
-  const n = activeNote(); if (!n || !n.tocOn || $("toc-bar").hidden) return;
+  const n = activeNote(); const bar = $("toc-bar");
+  if (!n || !tocIsOn(n) || !bar || bar.hidden) return;
   const secs = tocSections(), total = secs.length, th = 46;
   let active = 0;
   for (let i = 0; i < secs.length; i++) { if (tocScrollTop(secs[i].el) - editor.scrollTop <= th) active = i; }
   tocActiveIndex = active;
   const cur = secs[active];
-  const numEl = $("toc-num");
-  numEl.textContent = n.numbered && total ? String(active + 1) : "";
-  numEl.style.display = n.numbered && total ? "" : "none";
-  $("toc-current").textContent = total ? (cur ? cur.text : "") : "No headings yet";
-  $("toc-pos").textContent = total ? `${active + 1}/${total}` : "";
+  const numEl = $("toc-cur-num");
+  if (numEl) { const show = n.numbered && total; numEl.textContent = show ? String(active + 1) : ""; numEl.style.display = show ? "" : "none"; }
+  const title = $("toc-cur-title"); if (title) title.textContent = total ? (cur ? cur.text : "") : "No headings yet";
+  const pos = $("toc-pos"); if (pos) pos.textContent = total ? `${active + 1}/${total}` : "";
   const max = editor.scrollHeight - editor.clientHeight;
   const prog = max > 0 ? (editor.scrollTop / max) * 100 : 0;
-  document.querySelectorAll(".toc-progress-fill").forEach((f) => { f.style.width = prog.toFixed(1) + "%"; });
+  const bf = $("toc-bar-fill"), mf = $("toc-menu-fill");
+  if (bf) bf.style.width = prog.toFixed(1) + "%";
+  if (mf) mf.style.width = prog.toFixed(1) + "%";
   // keep the open menu's active-row highlight in sync while scrolling
-  if (!$("toc-menu").hidden) {
-    const rows = $("toc-menu").querySelectorAll(".toc-row");
+  if (tocMenuIsOpen()) {
+    const rows = $("toc-menu-list").querySelectorAll(".toc-menu-row");
     rows.forEach((r, i) => r.classList.toggle("is-active", i === active));
   }
 }
 function renderTocMenu(n) {
-  const menu = $("toc-menu"); menu.innerHTML = "";
+  const list = $("toc-menu-list"); if (!list) return; list.innerHTML = "";
   const secs = tocSections();
-  const scroll = elc("div", "toc-scroll");
-  if (!secs.length) { const e = elc("div", "toc-empty"); e.textContent = "No headings in this note yet."; scroll.appendChild(e); }
+  if (!secs.length) { const e = elc("li", "toc-empty"); e.textContent = "No headings in this note yet."; list.appendChild(e); return; }
   secs.forEach((s, i) => {
-    const row = elc("button", "toc-row lvl" + s.level + (i === tocActiveIndex ? " is-active" : ""));
+    const li = elc("li");
+    const row = elc("button", "toc-menu-row lvl" + s.level + (i === tocActiveIndex ? " is-active" : ""));
     if (n.numbered) { const num = elc("span", "toc-rownum"); num.textContent = String(i + 1); row.appendChild(num); }
     const t = elc("span", "toc-rowtitle"); t.textContent = s.text; row.appendChild(t);
     row.addEventListener("click", () => tocJump(i));
-    scroll.appendChild(row);
+    li.appendChild(row); list.appendChild(li);
   });
-  menu.appendChild(scroll);
-  const prog = elc("div", "toc-progress toc-menu-progress"); prog.innerHTML = '<div class="toc-progress-fill"></div>';
-  menu.appendChild(prog);
 }
-function positionTocMenu() { $("toc-menu").style.top = $("toc-bar").getBoundingClientRect().bottom + "px"; }
+// B3: while the menu is open the scroll-progress bar relocates to hug the menu's
+// bottom edge (the bar's own progress is hidden via .is-open); it returns on close.
 function openTocMenu() {
-  const n = activeNote(); if (!n || !n.tocOn) return;
+  const n = activeNote(); if (!n || !tocIsOn(n)) return;
   closeAllPopovers();
   renderTocMenu(n);
-  $("toc-menu").hidden = false; $("toc-bar").classList.add("menu-open");
-  positionTocMenu(); updateTocState();
+  $("toc-menu").hidden = false;
+  const bar = $("toc-bar"); if (bar) { bar.classList.add("is-open"); bar.setAttribute("aria-expanded", "true"); }
+  updateTocState();
 }
-function closeTocMenu() { $("toc-menu").hidden = true; $("toc-bar").classList.remove("menu-open"); updateTocState(); }
-function toggleTocMenu() { if ($("toc-menu").hidden) openTocMenu(); else closeTocMenu(); }
+function closeTocMenu() {
+  const m = $("toc-menu"); if (m) m.hidden = true;
+  const bar = $("toc-bar"); if (bar) { bar.classList.remove("is-open"); bar.setAttribute("aria-expanded", "false"); }
+  updateTocState();
+}
+function toggleTocMenu() { if (tocMenuIsOpen()) closeTocMenu(); else openTocMenu(); }
 function tocJump(i) {
   const s = tocSections()[i]; if (!s) return;
   editor.scrollTo({ top: Math.max(0, tocScrollTop(s.el) - 12), behavior: "smooth" });
   closeTocMenu();
 }
-// The on/off toggle (wired from the note ••• menu).
+// The on/off toggle (wired from the note actions menu).
 function toggleToc() {
   const n = activeNote(); if (!n) return;
-  n.tocOn = !n.tocOn; n.updatedAt = now(); saveNotes();
+  n.tocOn = !tocIsOn(n); n.updatedAt = now(); saveNotes();
   if (!n.tocOn) closeTocMenu();
   renderToc(n);
   $("note-menu").hidden = true;
@@ -734,14 +626,26 @@ function addLink() {
   else { const a = elc("a"); a.href = url; a.textContent = url; insertInline(a); }
   queueSave(); syncToolbar();
 }
-function applyColor(color) { focusEditor(); document.execCommand("foreColor", false, color); queueSave(); }
-function applyBadge(bg, fg) {
+// G2: the editor ink/badge palette is a token, never a hardcoded hex. We keep the
+// six status KEYS here and resolve the live hex from tokens.css at apply time, so
+// this file holds no editor-color literals and the palette re-themes with tokens.
+function tokenHex(name) { return getComputedStyle(document.body).getPropertyValue(name).trim(); }
+function statusHex(key) { return tokenHex("--status-" + key); }
+function applyColor(color) { focusEditor(); if (color) document.execCommand("foreColor", false, color); queueSave(); }
+function applyBadge(key) {
   focusEditor();
+  const hex = statusHex(key);
   const sel = window.getSelection();
-  const span = elc("span", "badge"); span.style.backgroundColor = bg; span.style.color = fg;
+  const span = elc("span", "badge"); span.style.color = hex; span.style.backgroundColor = rgbaFromHex(hex, 0.16);
   if (sel && !sel.isCollapsed) { const txt = sel.toString(); span.textContent = txt; const r = sel.getRangeAt(0); r.deleteContents(); r.insertNode(span); caretAfter(span); }
   else { span.textContent = "Label"; insertInline(span); }
   queueSave();
+}
+// Soft same-hue fill for badges: the resolved status hex at low alpha.
+function rgbaFromHex(hex, a) {
+  const m = /^#?([\da-f]{2})([\da-f]{2})([\da-f]{2})$/i.exec((hex || "").trim());
+  if (!m) return hex;
+  return `rgba(${parseInt(m[1], 16)}, ${parseInt(m[2], 16)}, ${parseInt(m[3], 16)}, ${a})`;
 }
 
 /* ---------- style dropdown ---------- */
@@ -772,7 +676,8 @@ function syncToolbar() {
 }
 
 /* ---------- text size (accessibility; persisted, whole-note scale) ---------- */
-const SIZES = [["small","Small"],["regular","Regular"],["large","Large"],["supersize","Supersize"]];
+// [key, label, preview font-size for the Aa sample in the menu (F3)]
+const SIZES = [["small","Small","13px"],["regular","Regular","15px"],["large","Large","17px"],["supersize","Supersize","20px"]];
 function applyTextSize() {
   const sz = SIZES.some(([k]) => k === state.settings.textSize) ? state.settings.textSize : "regular";
   SIZES.forEach(([k]) => editor.classList.toggle("size-" + k, k === sz));
@@ -780,9 +685,16 @@ function applyTextSize() {
   const cur = $("size-current"); if (cur) cur.textContent = lbl;
   $("size-menu").querySelectorAll("button").forEach((b) => b.classList.toggle("sel", b.dataset.size === sz));
 }
+// Each row: label + an "Aa" preview at that scale; a check marks the active row.
 function buildSizeMenu() {
   const m = $("size-menu"); m.innerHTML = "";
-  SIZES.forEach(([k, label]) => { const b = elc("button"); b.dataset.size = k; b.textContent = label; b.addEventListener("click", () => setTextSize(k)); m.appendChild(b); });
+  SIZES.forEach(([k, label, px]) => {
+    const b = elc("button"); b.dataset.size = k;
+    const l = elc("span"); l.textContent = label;
+    const aa = elc("span", "sz-aa"); aa.textContent = "Aa"; aa.style.fontSize = px;
+    b.append(l, aa);
+    b.addEventListener("click", () => setTextSize(k)); m.appendChild(b);
+  });
 }
 function setTextSize(k) {
   state.settings.textSize = k; applyTextSize(); saveSettings(); $("size-menu").hidden = true;
@@ -875,22 +787,25 @@ function elLinkCard() {
     queueSave();
   });
 }
+// Slash blocks. `lu` is a Lucide sprite id (rendered as <use>); headings use a
+// short text token. No literal bullet/check/glyph icons — Lucide only (D).
 const ELEMENTS = [
-  { key: "h1", label: "Title", icon: "H₁", aliases: ["title","heading1"], run: () => applyStyle("H1") },
-  { key: "h2", label: "Heading", icon: "H₂", aliases: ["heading2"], run: () => applyStyle("H2") },
-  { key: "h3", label: "Subheading", icon: "H₃", aliases: ["heading3","subheading"], run: () => applyStyle("H3") },
-  { key: "bullet", label: "Bullet list", icon: "•", aliases: ["ul","unordered","list"], run: () => exec("insertUnorderedList") },
-  { key: "number", label: "Numbered", icon: "1.", aliases: ["ol","ordered"], run: () => exec("insertOrderedList") },
-  { key: "todo", label: "Checklist", icon: "☑", aliases: ["checkbox","check","task"], run: () => makeChecklist() },
-  { key: "quote", label: "Quote", icon: "❝", aliases: ["blockquote"], run: () => applyStyle("BLOCKQUOTE") },
-  { key: "divider", label: "Divider", icon: "—", aliases: ["hr","rule","separator"], run: elDivider },
-  { key: "callout", label: "Callout", icon: "💡", aliases: ["banner","note","info"], run: elCallout },
-  { key: "toggle", label: "Toggle", icon: "▸", aliases: ["collapse","accordion","details"], run: elToggle },
-  { key: "code", label: "Code", icon: "{ }", aliases: ["pre","snippet"], run: elCode },
-  { key: "image", label: "Image", icon: "🖼", aliases: ["img","picture","upload"], run: elImage },
-  { key: "bookmark", label: "Link card", icon: "🔗", aliases: ["link","bookmark","embed"], run: elLinkCard },
-  { key: "table", label: "Table", icon: "▦", aliases: ["grid"], run: elTable }
+  { key: "h1", label: "Title", icon: "H1", aliases: ["title","heading1"], run: () => applyStyle("H1") },
+  { key: "h2", label: "Heading", icon: "H2", aliases: ["heading2"], run: () => applyStyle("H2") },
+  { key: "h3", label: "Subheading", icon: "H3", aliases: ["heading3","subheading"], run: () => applyStyle("H3") },
+  { key: "bullet", label: "Bullet list", lu: "list", aliases: ["ul","unordered","list"], run: () => exec("insertUnorderedList") },
+  { key: "number", label: "Numbered", lu: "list-ordered", aliases: ["ol","ordered"], run: () => exec("insertOrderedList") },
+  { key: "todo", label: "Checklist", lu: "list-checks", aliases: ["checkbox","check","task"], run: () => makeChecklist() },
+  { key: "quote", label: "Quote", lu: "quote", aliases: ["blockquote"], run: () => applyStyle("BLOCKQUOTE") },
+  { key: "divider", label: "Divider", lu: "minus", aliases: ["hr","rule","separator"], run: elDivider },
+  { key: "callout", label: "Callout", lu: "message-square", aliases: ["banner","note","info"], run: elCallout },
+  { key: "toggle", label: "Toggle", lu: "chevron-right", aliases: ["collapse","accordion","details"], run: elToggle },
+  { key: "code", label: "Code", lu: "code", aliases: ["pre","snippet"], run: elCode },
+  { key: "image", label: "Image", lu: "image", aliases: ["img","picture","upload"], run: elImage },
+  { key: "bookmark", label: "Link card", lu: "link", aliases: ["link","bookmark","embed"], run: elLinkCard },
+  { key: "table", label: "Table", lu: "table", aliases: ["grid"], run: elTable }
 ];
+function slashIcon(e) { return e.lu ? `<svg viewBox="0 0 24 24"><use href="#i-${e.lu}"/></svg>` : (e.icon || ""); }
 
 /* ---------- slash menu ---------- */
 let slashCtx = null, slashSel = 0, slashItems = [];
@@ -918,7 +833,7 @@ function showSlash(q) {
   if (!slashItems.length) { box.innerHTML = '<div class="slash-empty">No blocks match “' + q + '”</div>'; }
   else {
     let html = '<div class="slash-hint">↑↓ to move · Enter or Tab to insert</div><div class="slash-grid">';
-    slashItems.forEach((e, i) => { html += `<div class="slash-item${i === 0 ? " sel" : ""}" data-i="${i}"><div class="slash-ico">${e.icon}</div><div class="slash-label">${e.label}</div></div>`; });
+    slashItems.forEach((e, i) => { html += `<div class="slash-item${i === 0 ? " sel" : ""}" data-i="${i}"><div class="slash-ico">${slashIcon(e)}</div><div class="slash-label">${e.label}</div></div>`; });
     box.innerHTML = html + "</div>";
     box.querySelectorAll(".slash-item").forEach((it) => { it.addEventListener("mousedown", (ev) => { ev.preventDefault(); chooseSlash(slashItems[+it.dataset.i]); }); });
   }
@@ -940,28 +855,55 @@ function deleteSlashText() {
 }
 function chooseSlash(elDef) { if (!elDef) return; deleteSlashText(); hideSlash(); elDef.run(); }
 
-/* ---------- popovers ---------- */
-const TEXT_COLORS = ["#e23b3b","#e07b1a","#d6a400","#2ea043","#2f6fed","#7c3aed","#db2777","#111111","#6b7280","#0e7490","#9a3412","#1f2937"];
-const BADGE_COLORS = [["#e8f0fe","#2f6fed"],["#fde8e8","#c0392b"],["#fff1d6","#b7791f"],["#e6f6ea","#2e7d32"],["#f1e7fd","#7c3aed"],["#fce7f1","#db2777"],["#eceff3","#475569"],["#1f2937","#ffffff"]];
+/* ---------- color / badge menu (6-color status palette) ----------
+   Exactly six ink colors, exactly six badges (G2). Blue is NOT an ink color
+   (blue = app). Two columns TEXT + BADGE, with a centered "Reset text color".
+   Every value is a --status-* token resolved live; no hex lives in this file. */
+const STATUS_KEYS = ["positive", "alert", "warning", "negative", "information", "new"];
 function buildPopovers() {
   const cp = $("color-pop"); cp.innerHTML = "";
-  const s1 = elc("div", "pop-section"); s1.innerHTML = '<div class="pop-label">Text color</div>';
-  const g1 = elc("div", "swatch-grid");
-  TEXT_COLORS.forEach((c) => { const s = elc("div", "swatch"); s.style.background = c; s.addEventListener("mousedown", (e) => { e.preventDefault(); applyColor(c); cp.hidden = true; }); g1.appendChild(s); });
-  s1.appendChild(g1); cp.appendChild(s1);
+  const cols = elc("div", "color-cols");
 
-  const s2 = elc("div", "pop-section"); s2.innerHTML = '<div class="pop-label">Badge</div>';
+  const textCol = elc("div", "color-col");
+  textCol.appendChild(Object.assign(elc("div", "pop-label"), { textContent: "TEXT" }));
+  const g1 = elc("div", "swatch-grid");
+  STATUS_KEYS.forEach((k) => {
+    const s = elc("button", "swatch"); s.style.background = `var(--status-${k})`; s.title = k;
+    s.addEventListener("mousedown", (e) => { e.preventDefault(); applyColor(statusHex(k)); cp.hidden = true; });
+    g1.appendChild(s);
+  });
+  textCol.appendChild(g1);
+
+  const badgeCol = elc("div", "color-col");
+  badgeCol.appendChild(Object.assign(elc("div", "pop-label"), { textContent: "BADGE" }));
   const g2 = elc("div", "swatch-grid");
-  BADGE_COLORS.forEach(([bg, fg]) => { const s = elc("div", "swatch"); s.style.background = bg; s.style.color = fg; s.textContent = "A"; s.style.display = "grid"; s.style.placeItems = "center"; s.style.fontWeight = "700"; s.style.fontSize = "12px"; s.addEventListener("mousedown", (e) => { e.preventDefault(); applyBadge(bg, fg); cp.hidden = true; }); g2.appendChild(s); });
-  s2.appendChild(g2); cp.appendChild(s2);
+  STATUS_KEYS.forEach((k) => {
+    const s = elc("button", "swatch swatch-badge"); s.textContent = "A";
+    s.style.color = `var(--status-${k})`; s.style.background = `color-mix(in srgb, var(--status-${k}) 16%, transparent)`; s.title = k;
+    s.addEventListener("mousedown", (e) => { e.preventDefault(); applyBadge(k); cp.hidden = true; });
+    g2.appendChild(s);
+  });
+  badgeCol.appendChild(g2);
+
+  cols.append(textCol, badgeCol); cp.appendChild(cols);
+
+  const reset = elc("button", "color-reset");
+  reset.appendChild(svgUse("rotate-ccw", "color-reset-ic"));
+  reset.appendChild(Object.assign(elc("span"), { textContent: "Reset text color" }));
+  reset.addEventListener("mousedown", (e) => { e.preventDefault(); applyColor(tokenHex("--ink-reset")); cp.hidden = true; });
+  cp.appendChild(reset);
 }
-function closeAllPopovers() { ["style-menu","color-pop","size-menu","note-info","conn-drawer","toc-menu"].forEach((id) => { $(id).hidden = true; }); $("toc-bar").classList.remove("menu-open"); }
+function closeAllPopovers() {
+  ["style-menu", "color-pop", "size-menu"].forEach((id) => { const el = $(id); if (el) el.hidden = true; });
+  closeConnDrawer(); closeTocMenu();
+}
 function openPopover(popId, anchor) {
   closeAllPopovers();
   const pop = $(popId); pop.hidden = false;
   const r = anchor.getBoundingClientRect();
   const pw = document.documentElement.clientWidth;
   pop.style.top = (r.bottom + 6) + "px";
+  pop.style.right = "auto";
   pop.style.left = Math.max(8, Math.min(r.left, pw - pop.offsetWidth - 10)) + "px";
 }
 
@@ -1124,7 +1066,7 @@ async function consumePendingCapture() {
     editor.focus();
     if (!restoreCaptureCaret()) caretIntoEnd(editor);
     document.execCommand("insertHTML", false, sanitizeHtml(cap.html));
-    updateChecklistCounts(); queueSave(); syncProvMenuItem();
+    updateChecklistCounts(); queueSave();
   } else {
     target.html = (target.html && target.html.trim() ? target.html : "") + cap.html;
     target.updatedAt = now();
@@ -1179,7 +1121,7 @@ function onKeydown(e) {
 const GUIDE_HTML = `
 <p class="lead">A fast, tab-aware notepad in your side panel. Open or close it anytime with <kbd>⌘/Ctrl + Shift + E</kbd> (rebindable below).</p>
 <h2>Blocks &amp; the slash menu</h2>
-<p>Type <code>/</code> anywhere for the element grid, or hit <strong>＋</strong> in the toolbar. Partial names work — <code>/cod</code> + <kbd>Enter</kbd> drops a code block, <code>/ban</code> a callout. Arrows move, <kbd>Enter</kbd> or <kbd>Tab</kbd> inserts.</p>
+<p>Type <code>/</code> anywhere for the element grid, or hit the <strong>/ cmd</strong> chip in the toolbar. Partial names work — <code>/cod</code> + <kbd>Enter</kbd> drops a code block, <code>/ban</code> a callout. Arrows move, <kbd>Enter</kbd> or <kbd>Tab</kbd> inserts.</p>
 <p>Available: Title / Heading / Subheading, bullet · numbered · checklist, quote, divider, callout, toggle, code, image (uploaded &amp; downscaled, stored locally), link card (pulls a page's title/description/image), and table.</p>
 <h2>Text styling</h2>
 <ul>
@@ -1189,7 +1131,7 @@ const GUIDE_HTML = `
 <li><strong>Checklist</strong>: hollow circles with a live count at the top; click a circle to check it — the line goes muted and struck through.</li>
 </ul>
 <h2>Margin Numbers</h2>
-<p>From a note's <strong>⋯</strong> menu, switch on <strong>Margin Numbers</strong> to number every block down a faint left gutter — top-level blocks <code>1, 2, 3</code>, with list items and table rows as <code>12.1, 12.2</code>. They're a live positional reference, not a permanent ID, so they renumber as you write. Per-note, off by default.</p>
+<p>From a note's <strong>actions</strong> menu, switch on <strong>Margin Numbers</strong> to number every block down a faint left gutter — top-level blocks <code>1, 2, 3</code>, with list items and table rows as <code>12.1, 12.2</code>. They're a live positional reference, not a permanent ID, so they renumber as you write. Per-note, off by default.</p>
 <h2>Keyboard (mirrors Google Docs)</h2>
 <ul>
 <li>Title / Heading / Subheading — <kbd>⌥⌘ / Alt+Ctrl + 1 / 2 / 3</kbd></li>
@@ -1207,9 +1149,9 @@ const GUIDE_HTML = `
 <li><strong>🔓 Unlocked</strong> — the panel follows the active tab, surfacing that page's note as you move.</li>
 </ul>
 <p>Notes are matched <strong>per page</strong>, so each Claude chat or Google Doc keeps its own. Empty notes are never saved, so this stays clutter-free. New notes auto-title as <code>Site · Page · Jun 28 3:30a</code>.</p>
-<p>A note remembers <strong>every page it's drawn from</strong> — its sources. Capture from another page into a note and that page joins the note's set; unlocked, the note then surfaces on <em>any</em> of those pages. The exact source URLs are kept (for provenance) but stay out of the way until you ask for them — open <strong>Note info</strong> in the note ⋯ menu to see them, along with when the note was created and last updated.</p>
+<p>A note remembers <strong>every page it's drawn from</strong> — its sources. Capture from another page into a note and that page joins the note's set; unlocked, the note then surfaces on <em>any</em> of those pages. The exact source URLs are kept (for provenance) but stay out of the way until you ask for them — open <strong>Note info</strong> in the note actions menu to see them, along with when the note was created and last updated.</p>
 <p>Right-click any selection on a page → <strong>Save selection to Margin</strong> drops it as a sourced quote into that page's note.</p>
-<p>Or select on a page and press <kbd>⌘/Ctrl + Shift + Y</kbd> — <strong>paste-from-page</strong> drops that selection straight into the note you're <em>currently</em> looking at, at your cursor, tagged with the page it came from. Because it reads the live page, the source is certain (free-form ⌘V pastes aren't tagged — the browser can't tell where copied text came from). Open <strong>Show paste sources</strong> in the note ⋯ menu to reveal a faint <em>from ‹site›</em> under each pasted block; the full URL is on hover.</p>
+<p>Or select on a page and press <kbd>⌘/Ctrl + Shift + Y</kbd> — <strong>paste-from-page</strong> drops that selection straight into the note you're <em>currently</em> looking at, at your cursor, tagged with the page it came from. Because it reads the live page, the source is certain (free-form ⌘V pastes aren't tagged — the browser can't tell where copied text came from). Open <strong>Show paste sources</strong> in the note actions menu to reveal a faint <em>from ‹site›</em> under each pasted block; the full URL is on hover.</p>
 <h2>Organising notes</h2>
 <p>On the all-notes list, hit <strong>Select</strong> to multi-pick. From there you can <strong>Delete</strong> in bulk, or <strong>Merge</strong> two or more into one — bodies stack newest-on-top with a divider, and each chunk is headed by its original title so you can tell the pieces apart. The newest note's title becomes the merged note's, and every page the notes came from is pooled into its sources. A merge can be <strong>undone</strong> from the toast that appears.</p>
 <h2>Privacy</h2>
@@ -1219,11 +1161,11 @@ const CHANGELOG_HTML = `
 <div class="ver"><span class="ver-tag">v0.10.0</span><span class="ver-date">Jun 29, 2026</span></div>
 <ul>
 <li><strong>Paste-from-page</strong> — select text on any page and hit <kbd>⌘/Ctrl + Shift + Y</kbd> to drop it into the note you're <strong>currently viewing</strong>, right at your cursor, tagged with the page it came from. Unlike right-click capture (which makes a quote), this is a plain paste — and because it reads the live page, the source is <strong>certain</strong>.</li>
-<li><strong>Paste sources, on demand</strong> — a new <strong>Show paste sources</strong> toggle in the note ⋯ menu reveals a faint <em>from ‹site›</em> beneath each pasted block (full URL on hover), so you can see at a glance what you wrote versus what you borrowed. Off by default; the note reads clean until you ask.</li>
+<li><strong>Paste sources, on demand</strong> — a new <strong>Show paste sources</strong> toggle in the note actions menu reveals a faint <em>from ‹site›</em> beneath each pasted block (full URL on hover), so you can see at a glance what you wrote versus what you borrowed. Off by default; the note reads clean until you ask.</li>
 </ul>
 <div class="ver"><span class="ver-tag">v0.9.0</span><span class="ver-date">Jun 29, 2026</span></div>
 <ul>
-<li><strong>Note info</strong> — the note ⋯ menu gains <strong>Note info</strong>: a panel showing every <strong>source URL</strong> the note was drawn from (click to open), plus when it was <strong>created</strong> and last <strong>updated</strong>. The full URLs were always stored — this is where you see them. Older notes show the page path they carried over with.</li>
+<li><strong>Note info</strong> — the note actions menu gains <strong>Note info</strong>: a panel showing every <strong>source URL</strong> the note was drawn from (click to open), plus when it was <strong>created</strong> and last <strong>updated</strong>. The full URLs were always stored — this is where you see them. Older notes show the page path they carried over with.</li>
 </ul>
 <div class="ver"><span class="ver-tag">v0.8.0</span><span class="ver-date">Jun 29, 2026</span></div>
 <ul>
@@ -1238,7 +1180,7 @@ const CHANGELOG_HTML = `
 </ul>
 <div class="ver"><span class="ver-tag">v0.6.0</span><span class="ver-date">Jun 29, 2026</span></div>
 <ul>
-<li><strong>Margin Numbers</strong> — a per-note toggle (note ⋯ menu) that numbers each block down a faint left gutter, legal-style: top-level blocks <code>1, 2, 3</code>, and list items / table rows as <code>12.1, 12.2</code>. A whisper-quiet alternating row tint shows each number's span. Positional only — it renumbers live.</li>
+<li><strong>Margin Numbers</strong> — a per-note toggle (note actions menu) that numbers each block down a faint left gutter, legal-style: top-level blocks <code>1, 2, 3</code>, and list items / table rows as <code>12.1, 12.2</code>. A whisper-quiet alternating row tint shows each number's span. Positional only — it renumbers live.</li>
 <li><strong>Text size</strong> — a sizer in the toolbar (Small / Regular / Large / Supersize) scales a whole note evenly. It's a setting, so it sticks across notes — accessibility, not formatting.</li>
 <li><strong>Selection count</strong> — the footer now shows the live word count of whatever you've selected, beside the note total.</li>
 <li><strong>Lists & indenting</strong> — <kbd>⌘/Ctrl + ]</kbd> and <kbd>[</kbd> indent / outdent lists (and plain paragraphs); a little more breathing room between items.</li>
@@ -1274,7 +1216,7 @@ const CHANGELOG_HTML = `
 <div class="ver"><span class="ver-tag">v0.4.0</span><span class="ver-date">Jun 28, 2026</span></div>
 <ul>
 <li><strong>Page-granular notes</strong> — matching moved from domain to per-page, so multiple Claude tabs or a Doc vs a Sheet each keep a distinct note.</li>
-<li><strong>In-app Guide &amp; Version log</strong> — this screen, from the ⋯ menu.</li>
+<li><strong>In-app Guide &amp; Version log</strong> — this screen, from the actions menu.</li>
 <li><strong>Wordmark</strong> — Margin · Side notes for the web.</li>
 </ul>
 <div class="ver"><span class="ver-tag">v0.3.1</span><span class="ver-date">Jun 28, 2026</span></div>
@@ -1355,9 +1297,7 @@ function bind() {
   editor = $("editor");
   buildStyleMenu(); buildPopovers(); buildSizeMenu(); applyTextSize();
 
-  $("open-browser").innerHTML = ICON.home;
-  $("app-menu-btn").innerHTML = ICON.gear;
-  $("app-menu-btn-2").innerHTML = ICON.gear;
+  // Topbar icons (home / settings) are static Lucide <use> sprites in the HTML now.
   $("open-browser").addEventListener("click", showBrowser);
   const openAppMenu = (e) => { e.stopPropagation(); closeAllPopovers(); $("note-menu").hidden = true; $("app-menu").hidden = !$("app-menu").hidden; };
   $("app-menu-btn").addEventListener("click", openAppMenu);
@@ -1371,15 +1311,28 @@ function bind() {
   $("lock-toggle").addEventListener("click", () => setFollow(!state.settings.follow));
   $("theme-toggle").addEventListener("click", toggleTheme);
 
+  // Locked note-menu set (F2): connected · toc · mnumbers · copy · download · favorite · delete.
+  // The single Download row exposes both formats as clickable .md / .html chips.
+  const dlHint = $("note-menu").querySelector('[data-act="export"] .menu-hint');
+  if (dlHint) {
+    dlHint.textContent = "";
+    ["md", "html"].forEach((f, i) => {
+      if (i) dlHint.appendChild(document.createTextNode(" · "));
+      const chip = elc("span", "dl-fmt"); chip.dataset.fmt = f; chip.textContent = "." + f; dlHint.appendChild(chip);
+    });
+  }
   $("note-menu").addEventListener("click", (e) => {
+    const fmtEl = e.target.closest("[data-fmt]");
+    if (fmtEl) { e.stopPropagation(); $("note-menu").hidden = true; exportNote(fmtEl.dataset.fmt); return; }
     const btn = e.target.closest("button"); if (!btn) return; $("note-menu").hidden = true;
     ({ connected: openConnDrawer, toc: toggleToc, mnumbers: toggleMarginNumbers, copy: copyNote,
-       "export-md": () => exportNote("md"), "export-html": () => exportNote("html"),
-       pin: togglePin, info: showNoteInfo, prov: toggleProvenance, delete: deleteNote }[btn.dataset.act] || (() => {}))();
+       export: () => exportNote("md"), favorite: togglePin, delete: deleteNote }[btn.dataset.act] || (() => {}))();
   });
   $("app-menu").addEventListener("click", (e) => {
     const btn = e.target.closest("button"); if (!btn) return; $("app-menu").hidden = true;
-    ({ guide: () => openInfo("guide"), changelog: () => openInfo("changelog"), roadmap: () => openInfo("roadmap"), shortcut: () => chrome.tabs.create({ url: "chrome://extensions/shortcuts" }) }[btn.dataset.act] || (() => {}))();
+    ({ guide: () => openInfo("guide"), changelog: () => openInfo("changelog"),
+       settings: () => { try { chrome.runtime.openOptionsPage && chrome.runtime.openOptionsPage(); } catch (e) {} },
+       shortcut: () => chrome.tabs.create({ url: "chrome://extensions/shortcuts" }) }[btn.dataset.act] || (() => {}))();
   });
   $("sort-select").addEventListener("change", (e) => { state.settings.sort = e.target.value; saveSettings(); renderList(); });
 
@@ -1405,7 +1358,7 @@ function bind() {
   });
 
   // style dropdown
-  $("style-trigger").addEventListener("click", (e) => { e.stopPropagation(); const open = $("style-menu").hidden; closeAllPopovers(); if (open) { $("style-menu").hidden = false; syncToolbar(); } });
+  $("style-trigger").addEventListener("click", (e) => { e.stopPropagation(); const open = $("style-menu").hidden; closeAllPopovers(); if (open) { openPopover("style-menu", $("style-trigger")); syncToolbar(); } });
   $("size-trigger").addEventListener("click", (e) => { e.stopPropagation(); const open = $("size-menu").hidden; closeAllPopovers(); if (open) { applyTextSize(); openPopover("size-menu", $("size-trigger")); } });
   // toolbar commands
   document.querySelectorAll('.rt-toolbar [data-cmd]').forEach((b) => b.addEventListener("click", () => exec(b.dataset.cmd)));
@@ -1413,6 +1366,14 @@ function bind() {
   $("mn-toggle").addEventListener("click", (e) => { e.stopPropagation(); toggleMarginNumbers(); focusEditor(); });
   $("plus-btn").addEventListener("click", (e) => { e.stopPropagation(); focusEditor(); slashCtx = null; showSlash(""); });
   $("color-btn").addEventListener("click", (e) => { e.stopPropagation(); saveRange(); openPopover("color-pop", $("color-btn")); });
+
+  // Connected-pages band (static shell in HTML; JS drives open/close + list).
+  $("connected-toggle").addEventListener("click", (e) => { e.stopPropagation(); toggleConnDrawer(); });
+  const connClose = $("connected-drawer") && $("connected-drawer").querySelector('[data-act="close-connected"]');
+  if (connClose) connClose.addEventListener("click", (e) => { e.stopPropagation(); closeConnDrawer(); });
+  $("connected-filter").addEventListener("input", (e) => { connQuery = e.target.value; const n = activeNote(); if (n) renderConnList(n); });
+  $("connect-current").addEventListener("click", () => { const n = activeNote(); if (n) connectCurrentPage(n); });
+  $("connect-custom").addEventListener("click", () => { const n = activeNote(); if (n) addCustomUrl(n); });
 
   $("image-input").addEventListener("change", (e) => { const f = e.target.files && e.target.files[0]; if (f) handleImageFile(f); });
 
@@ -1437,19 +1398,14 @@ function bind() {
     if (!$("note-menu").hidden && !$("note-menu").contains(e.target) && !onNote) $("note-menu").hidden = true;
     if (!$("slash").hidden && !$("slash").contains(e.target)) hideSlash();
     const inBar = e.target.closest && e.target.closest(".rt-toolbar");
-    // The kebab button and the menu it opens both reach note-info: the button reopens the menu
-    // (which closes the panel via closeAllPopovers), and the menu is where the panel is opened
-    // from — so a click in either must not close note-info on the same bubbling event.
-    const onNoteMenu = e.target.closest && (e.target.closest("#note-menu-btn") || e.target.closest("#note-menu"));
-    if (!inBar) ["style-menu","color-pop","size-menu"].forEach((id) => { const p = $(id); if (!p.hidden && !p.contains(e.target)) p.hidden = true; });
-    if (!$("note-info").hidden && !$("note-info").contains(e.target) && !onNoteMenu) $("note-info").hidden = true;
+    if (!inBar) ["style-menu","color-pop","size-menu"].forEach((id) => { const p = $(id); if (p && !p.hidden && !p.contains(e.target)) p.hidden = true; });
     // Connected-pages drawer: dismiss on outside click, but not when the click is
-    // on its own count-chip toggle (in #conn) or the note-menu entry that opens it.
-    const onConn = e.target.closest && (e.target.closest("#conn") || e.target.closest("#conn-drawer") || e.target.closest("#note-menu"));
-    if (!$("conn-drawer").hidden && !$("conn-drawer").contains(e.target) && !onConn) closeConnDrawer();
+    // on the band itself (its toggle) or the note-menu entry that opens it.
+    const onConn = e.target.closest && (e.target.closest("#connected-band") || e.target.closest("#note-menu"));
+    if (connIsOpen() && !onConn) closeConnDrawer();
     // TOC dropdown: dismiss on outside click, but not on its own bar toggle.
     const onToc = e.target.closest && (e.target.closest("#toc-bar") || e.target.closest("#toc-menu"));
-    if (!$("toc-menu").hidden && !$("toc-menu").contains(e.target) && !onToc) closeTocMenu();
+    if (tocMenuIsOpen() && !onToc) closeTocMenu();
   });
 
   chrome.storage.onChanged.addListener((changes, area) => {
