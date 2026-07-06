@@ -95,6 +95,11 @@ Nav/UX overhaul landed: **blue icon** (one mid-tone glyph legible on every surfa
 
 **6. Paste provenance — show/hide which paragraphs came from the web** — ✅ **shipped v0.10.0.** Paste-from-page blocks carry `data-src`/`data-srchost`; a per-note **Show paste sources** toggle reveals a subtle "from ‹host›" under each (full URL on hover), off by default. **Resolved watch-item:** rather than guess the source of free-form `⌘V` pastes, only the *certain* path (#5) is tagged — every `data-src` is trustworthy. **Lift:** M.
 
+**21. "Connect this page" — a one-click action, out of the drawer** — surface the connect-current-page action as an **always-visible button in the collapsed connected-pages band**, not buried behind the drawer toggle. The scenario: a user reading with the **notepad locked** tabs through several pages that all feed one note; today linking each one means open drawer → *Connect this page* → close. Lift it into the band so it's a **single click** to union the current tab into the note's `sources[]`. The machinery already exists — `connectCurrentPage()` mutates the set, `currentPageConnected()` / `syncConnActions()` already compute the exact done/disabled state the drawer's `#connect-current` button shows — so this is mostly **relocating an action, not building one**: a compact band affordance driven by the same state.
+- **Touches:** `renderConn()` (the collapsed band) + a small button in the band shell; reuse `connectCurrentPage`, `currentPageConnected`, and the `is-done`/`disabled` sync from `syncConnActions`. No data-model change.
+- **Watch:** the button has to read **live state as tabs change** — invite "Connect this page" only when there's a real web page in view *and* it isn't already a source; collapse to a quiet "connected" glyph (never a redundant second connect) once it is. It also competes for room with the favicon chips and the count/expand toggle, so it can't crowd the band — a single icon-button that folds to done is the safe shape.
+- **Lift:** S.
+
 *(B3 remains; B4/B5 were already resolved in the panel capture path #5 reuses.)*
 
 ---
