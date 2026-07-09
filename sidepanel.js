@@ -140,10 +140,14 @@ function setUse(btn, id) { const u = btn && btn.querySelector("use"); if (u) u.s
 function applyTheme() {
   const dark = state.settings.theme === "dark";
   document.body.classList.toggle("dark", dark);
+  // The app-bar theme button was removed; keep this null-safe so applyTheme()
+  // still drives the theme (and re-syncs any future settings-page control).
   const tb = $("theme-toggle");
-  setUse(tb, dark ? "moon" : "sun");
-  tb.classList.toggle("on", dark);
-  tb.title = dark ? "Dark mode (click for light)" : "Light mode (click for dark)";
+  if (tb) {
+    setUse(tb, dark ? "moon" : "sun");
+    tb.classList.toggle("on", dark);
+    tb.title = dark ? "Dark mode (click for light)" : "Light mode (click for dark)";
+  }
 }
 function toggleTheme() { state.settings.theme = state.settings.theme === "dark" ? "light" : "dark"; applyTheme(); saveSettings(); }
 function applyLockIcon() {
@@ -410,6 +414,20 @@ function renderConn(n) {
       if (/^https?:/i.test(s.url || "")) { chip.title = s.url; chip.addEventListener("click", () => chrome.tabs.create({ url: s.url })); }
       chips.appendChild(chip);
     });
+    // Quick action: a compact "+ Connect" chip trailing the row, shown only when
+    // the current tab's page isn't already connected. One click unions it into
+    // sources[] — no need to open the drawer (mirrors #connect-current).
+    const url = state.tabInfo && state.tabInfo.url;
+    if (url && (state.pageKey || state.host) && !currentPageConnected(n)) {
+      const add = elc("button", "conn-chip conn-chip-add");
+      add.setAttribute("role", "listitem");
+      add.title = "Connect this page";
+      add.setAttribute("aria-label", "Connect this page to this note");
+      add.appendChild(svgUse("plus", "conn-add-ic"));
+      const lbl = elc("span", "conn-chip-name"); lbl.textContent = "Connect"; add.appendChild(lbl);
+      add.addEventListener("click", (e) => { e.stopPropagation(); connectCurrentPage(n); });
+      chips.appendChild(add);
+    }
   }
   const cnt = String(srcs.length);
   const c1 = $("connected-count"); if (c1) c1.textContent = cnt;
@@ -1320,7 +1338,9 @@ function bind() {
   $("new-note").addEventListener("click", newNote);
   $("new-note-2").addEventListener("click", newNote);
   $("lock-toggle").addEventListener("click", () => setFollow(!state.settings.follow));
-  $("theme-toggle").addEventListener("click", toggleTheme);
+  // theme-toggle removed from the app bar; toggleTheme() stays for a settings-page
+  // control. Wire it only if the button exists so removal can't break init.
+  { const tt = $("theme-toggle"); if (tt) tt.addEventListener("click", toggleTheme); }
 
   // Locked note-menu set (F2): connected · toc · mnumbers · copy · download · favorite · delete.
   // The single Download row exposes both formats as clickable .md / .html chips.

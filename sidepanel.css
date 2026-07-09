@@ -42,6 +42,13 @@ svg[viewBox] { width:17px; height:17px; fill:none; stroke:currentColor; stroke-w
 .pill-toggle:hover { color:var(--ink); border-color:var(--muted); }
 .pill-toggle svg { width:16px; height:16px; }
 .pill-toggle.on { background:var(--accent-soft); border-color:color-mix(in srgb, var(--accent) 32%, transparent); color:var(--accent); }
+/* Lock is a binary state that must read at a glance: LOCKED = a solid accent
+   fill (engaged), UNLOCKED = the plain muted outline. The padlock glyph also
+   swaps open/closed, so the state is never carried by color alone. */
+#lock-toggle.on { background:var(--accent); border-color:var(--accent); color:var(--on-accent); }
+#lock-toggle.on:hover { background:color-mix(in srgb, var(--accent) 86%, #000); border-color:color-mix(in srgb, var(--accent) 86%, #000); color:var(--on-accent); }
+#lock-toggle:not(.on) { color:var(--faint); }
+#lock-toggle:not(.on):hover { color:var(--ink); border-color:var(--muted); }
 
 /* ---------- title row + created line ---------- */
 .title-row { display:flex; align-items:center; padding-right:8px; background:var(--chrome); }
@@ -84,7 +91,7 @@ svg[viewBox] { width:17px; height:17px; fill:none; stroke:currentColor; stroke-w
    Collapsed = favicon chip row + count chip. Open = fixed-height drawer whose
    HEIGHT animates (does not hug content), so the action buttons never jump.
    =========================================================================== */
-.connected-band { position:relative; flex:0 0 auto; background:var(--bg); overflow:hidden;
+.connected-band { position:relative; flex:0 0 auto; background:var(--chrome); overflow:hidden;
   height:var(--drawer-closed); transition:height .34s var(--drawer-ease); }
 .connected-band[data-open="true"] { height:var(--drawer-open); background:var(--chrome); }
 
@@ -101,6 +108,13 @@ svg[viewBox] { width:17px; height:17px; fill:none; stroke:currentColor; stroke-w
 .conn-chip.is-active { background:var(--accent-soft); border-color:color-mix(in srgb, var(--accent) 32%, transparent); color:var(--accent); }
 .conn-chip-name { font:600 11.5px var(--ui); }
 .conn-fav { width:16px; height:16px; border-radius:4px; display:grid; place-items:center; color:#fff; font:700 9px var(--ui); flex:none; }
+/* quick-connect chip — trails the chip row when the current tab isn't in the set;
+   one click unions it in. Dashed accent outline reads as an "add" affordance. */
+.conn-chip-add { flex:none; padding:4px 9px 4px 7px; background:transparent; color:var(--accent);
+  border-style:dashed; border-color:color-mix(in srgb, var(--accent) 42%, transparent); }
+.conn-chip-add:hover { background:var(--accent-soft); filter:none; }
+.conn-add-ic { display:inline-flex; }
+.conn-add-ic svg { width:13px; height:13px; }
 
 /* pinned count chip (A3) */
 .conn-count-chip { all:unset; box-sizing:border-box; flex:none; display:inline-flex; align-items:center; gap:5px; padding:4px 6px 4px 8px; border-radius:8px;
@@ -316,9 +330,17 @@ a.conn-row-url:hover { color:var(--accent); }
 .editor.numbered > *:not(hr):not(.src):not(ul):not(ol):not(table)::before {
   content: counter(mn);
   position:absolute; top:0; left:-44px; width:34px;
-  text-align:right; font-family:var(--mono); font-size:.68em; line-height:inherit;
+  text-align:right; font-family:var(--mono); font-size:.68em;
+  /* Match the numeral's line box to the block's first text line so the number
+     sits ON that line instead of floating above it. The .68em numeral would
+     otherwise shrink an inherited line-height; calc(<block lh>em / .68) cancels
+     that and scales with the text-size control. Base = body line-height (1.6);
+     headings override below. */
+  line-height:calc(1.6em / .68);
   color:var(--faint); -webkit-user-select:none; user-select:none; pointer-events:none;
 }
+.editor.numbered > h1::before { line-height:calc(1.25em / .68); }
+.editor.numbered > h2::before { line-height:calc(1.3em / .68); }
 /* nested sub-blocks (list items · table rows) get a recessed inset sub-band + n.x numbers */
 .editor.numbered > ul, .editor.numbered > ol { counter-reset: mnsub; background:var(--surface-inset); border-left:2px solid var(--hairline); }
 .editor.numbered > table { counter-reset: mnsub; }
@@ -326,8 +348,11 @@ a.conn-row-url:hover { color:var(--accent); }
 .editor.numbered > ul > li:nth-child(even), .editor.numbered > ol > li:nth-child(even) { background:rgba(124,158,212,.05); }
 .editor.numbered > ul > li::before, .editor.numbered > ol > li::before {
   content: counter(mn) "." counter(mnsub);
-  position:absolute; top:0; left:-66px; width:48px;
-  text-align:right; font-family:var(--mono); font-size:.68em; line-height:inherit;
+  /* Sit in the same right-aligned gutter column as the top-level numbers,
+     clear of the inset sub-band's rail (which begins at the editor's left
+     padding) and the bullet — the old -66px/48px right-aligned onto the rail. */
+  position:absolute; top:0; left:-64px; width:34px;
+  text-align:right; font-family:var(--mono); font-size:.68em; line-height:calc(1.6em / .68);
   color:var(--faint); -webkit-user-select:none; user-select:none; pointer-events:none;
 }
 .editor.numbered > table tbody tr { counter-increment: mnsub; }
@@ -399,7 +424,10 @@ a.conn-row-url:hover { color:var(--accent); }
 
 .save-status { all:unset; display:inline-flex; align-items:center; gap:5px; cursor:default; color:var(--muted); font:inherit; }
 .save-icon { display:inline-flex; width:13px; height:13px; align-items:center; justify-content:center; }
-.save-icon > * { display:none; }
+/* Hide every glyph by default; the [data-state] rules below reveal exactly one.
+   Scoped through .save-status so this out-specifies the global `svg[viewBox]
+   { display:block }` reset — otherwise both the check and the × render. */
+.save-status .save-icon > * { display:none; }
 .save-icon svg { width:13px; height:13px; }
 .save-status[data-state="saved"] .save-check { display:inline-flex; color:var(--status-positive); }
 .save-status[data-state="error"] { color:var(--danger); }

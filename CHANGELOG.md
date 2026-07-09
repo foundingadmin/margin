@@ -1,5 +1,16 @@
 # Margin — version log
 
+## v0.13.0 — 2026-07-09
+
+App-bar + connected-pages pass, and two editor fixes.
+
+- **Clearer lock state** — the notepad lock now reads at a glance: **Locked** is a solid accent fill (engaged), **Unlocked** is a plain muted outline. The padlock glyph still swaps open/closed, so the state is never carried by color alone.
+- **Theme toggle out of the app bar** — the dark/light button is removed from the top bar to declutter it; it'll return on the full settings page later. The theme machinery (`applyTheme` / `toggleTheme`, persisted `settings.theme`, `dark` class on load) is untouched, and the JS references are null-guarded so nothing breaks.
+- **One-click "Connect this page"** — a compact **+ Connect** chip now trails the connected-pages chip row whenever the current tab isn't already in the note's set. One click unions it in — no need to open the drawer (roadmap #21). Hidden once the page is connected.
+- **Closed connected band matches the chrome** — when the drawer is closed, the band now uses the raised app surface (`--chrome`), so it sits flush with the title bar above and the format toolbar below instead of reading as the editor plane.
+- **Fix · margin numbers** — the gutter numerals were floating above their text lines and, for list items, colliding with the inset rail. Numbers now sit on their block's first text line (line box matched, scales with the text-size control) and all sit in one clean right-aligned gutter column, clear of the rail and bullets.
+- **Fix · save indicator showed ✓ and ✕ together** — the global `svg[viewBox]` reset was out-specifying the rule that hides the inactive save glyphs, so the × leaked through next to the check. The hide rule is now scoped through `.save-status` so exactly one glyph (check / × / pulsing dot) shows per state.
+
 ## v0.12.1 — 2026-07-09
 
 Editor accessibility pass — link contrast and a fuller text-color picker.
