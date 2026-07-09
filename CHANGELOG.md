@@ -1,5 +1,13 @@
 # Margin — version log
 
+## v0.12.1 — 2026-07-09
+
+Editor accessibility pass — link contrast and a fuller text-color picker.
+
+- **AAA link contrast** — note hyperlinks now use a dedicated `--link` token instead of the mid-tone `--accent`. The new values clear WCAG **AAA** (≥7:1) body-text contrast against the note plane: `#33517f` in light (8.0:1 on `--bg`, 7.4:1 on `--chrome`) and `#93abd1` in dark (7.8:1 on `--bg`). Splitting links off from the app accent keeps chrome/UI accents untouched. Applied to editor links, provenance/source links, and release-notes links.
+- **Neutral text colors (White / Black)** — the text-color menu gains a hairline-separated **NEUTRALS** row under the six status inks, exposing white and black as selectable text colors (theme-invariant `--ink-white` / `--ink-black` tokens; no hex literals in JS). White reads as the natural emphasis ink on the dark default theme, black on light; the white swatch carries a firmer ring so it stays legible on the light menu.
+- **Reset text color** — the picker's "Reset text color" control (re-applies the theme's neutral `--ink-reset`) is confirmed present alongside the new neutrals, and swatches gain a `:focus-visible` ring for keyboard users.
+
 ## v0.12.0 — 2026-07-03
 
 Azure editor polish — a second Claude Design round for the editor surface, closing the remaining gaps between the shipped app and the Margin Prototype. Restyle plus small JS-wired hooks; no token names or DOM IDs renamed.

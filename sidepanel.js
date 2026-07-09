@@ -860,6 +860,9 @@ function chooseSlash(elDef) { if (!elDef) return; deleteSlashText(); hideSlash()
    (blue = app). Two columns TEXT + BADGE, with a centered "Reset text color".
    Every value is a --status-* token resolved live; no hex lives in this file. */
 const STATUS_KEYS = ["positive", "alert", "warning", "negative", "information", "new"];
+// Neutral text colors, kept out of the 6-color status set. Values live in
+// tokens.css (theme-invariant), resolved live so this file holds no hex.
+const NEUTRAL_INKS = [{ title: "White", token: "--ink-white" }, { title: "Black", token: "--ink-black" }];
 function buildPopovers() {
   const cp = $("color-pop"); cp.innerHTML = "";
   const cols = elc("div", "color-cols");
@@ -873,6 +876,14 @@ function buildPopovers() {
     g1.appendChild(s);
   });
   textCol.appendChild(g1);
+  // NEUTRALS — white + black, in their own hairline-separated row under TEXT.
+  const gN = elc("div", "swatch-grid swatch-grid-neutral");
+  NEUTRAL_INKS.forEach((n) => {
+    const s = elc("button", "swatch swatch-neutral"); s.style.background = `var(${n.token})`; s.title = n.title;
+    s.addEventListener("mousedown", (e) => { e.preventDefault(); applyColor(tokenHex(n.token)); cp.hidden = true; });
+    gN.appendChild(s);
+  });
+  textCol.appendChild(gN);
 
   const badgeCol = elc("div", "color-col");
   badgeCol.appendChild(Object.assign(elc("div", "pop-label"), { textContent: "BADGE" }));
