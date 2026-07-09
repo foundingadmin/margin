@@ -1,5 +1,9 @@
 # Margin — version log
 
+## v0.13.1 — 2026-07-09
+
+- **"Connect this page" chip now leads the row** — the quick-connect chip moves to the front of the connected-pages chip row (before the source chips) so it's the first thing in the band and stays pinned at the left as the row scrolls.
+
 ## v0.13.0 — 2026-07-09
 
 App-bar + connected-pages pass, and two editor fixes.

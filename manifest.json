@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Margin \u00b7 Side notes for the web",
-  "version": "0.13.0",
+  "version": "0.13.1",
   "description": "A fast, tab-aware notepad in your Chrome side panel. Rich blocks, slash menu, page-linked notes, one-key toggle.",
   "permissions": [
     "storage",

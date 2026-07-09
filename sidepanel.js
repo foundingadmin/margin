@@ -406,15 +406,7 @@ function renderConn(n) {
 
   const chips = $("connected-chips"); if (chips) {
     chips.innerHTML = "";
-    srcs.forEach((s) => {
-      const chip = elc("button", "conn-chip" + (isCurrentSource(s) ? " is-active" : ""));
-      chip.setAttribute("role", "listitem");
-      chip.appendChild(faviconTile(s));
-      const nm = elc("span", "conn-chip-name"); nm.textContent = sourceLabel(s); chip.appendChild(nm);
-      if (/^https?:/i.test(s.url || "")) { chip.title = s.url; chip.addEventListener("click", () => chrome.tabs.create({ url: s.url })); }
-      chips.appendChild(chip);
-    });
-    // Quick action: a compact "+ Connect" chip trailing the row, shown only when
+    // Quick action: a compact "+ Connect" chip LEADING the row, shown only when
     // the current tab's page isn't already connected. One click unions it into
     // sources[] — no need to open the drawer (mirrors #connect-current).
     const url = state.tabInfo && state.tabInfo.url;
@@ -428,6 +420,14 @@ function renderConn(n) {
       add.addEventListener("click", (e) => { e.stopPropagation(); connectCurrentPage(n); });
       chips.appendChild(add);
     }
+    srcs.forEach((s) => {
+      const chip = elc("button", "conn-chip" + (isCurrentSource(s) ? " is-active" : ""));
+      chip.setAttribute("role", "listitem");
+      chip.appendChild(faviconTile(s));
+      const nm = elc("span", "conn-chip-name"); nm.textContent = sourceLabel(s); chip.appendChild(nm);
+      if (/^https?:/i.test(s.url || "")) { chip.title = s.url; chip.addEventListener("click", () => chrome.tabs.create({ url: s.url })); }
+      chips.appendChild(chip);
+    });
   }
   const cnt = String(srcs.length);
   const c1 = $("connected-count"); if (c1) c1.textContent = cnt;
