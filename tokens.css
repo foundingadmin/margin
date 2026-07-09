@@ -14,7 +14,9 @@
      spots — .title-row and .rt-toolbar — that needed the raised fill made
      explicit).
    - Slate-blue accent #6F8BB3 = "app / chrome" only (New, active toggles,
-     links, focus, progress). It is NOT an ink color — the user-facing text
+     focus, progress). Links use a dedicated, darker/brighter --link token that
+     clears WCAG AAA (>=7:1) against the note plane. Accent is NOT an ink color
+     — the user-facing text
      color tool is a separate 6-color status system baked into the editor.
    - Cool graphite neutrals, dark default; a light theme is derived for parity.
 
@@ -41,6 +43,10 @@
   --hairline:#d4dbe4;
   /* accent + states — slate-blue = app/chrome only */
   --accent:#4a6d9c; --accent-soft:#e8eef6; --on-accent:#ffffff;
+  /* link ink — a dedicated link color split from --accent so the mid-tone app
+     accent can stay as-is while links meet WCAG AAA (>=7:1) body-text contrast.
+     #33517f on --bg #fff = 8.0:1, on --chrome #f4f6f9 = 7.4:1 (both AAA). */
+  --link:#33517f;
   --danger:#c0392b;
   /* positive/success (save-state check, etc.); darkened for AA on the light plane.
      Kept as an alias of --status-positive so older references still resolve. */
@@ -65,6 +71,10 @@
   --status-positive:#3f9c6a; --status-alert:#b98b1e; --status-warning:#c26a2e;
   --status-negative:#c0392b; --status-information:#6a5cd0; --status-new:#c05070;
   --ink-reset:#1c2530;         /* "Reset text color" returns ink to neutral     */
+  /* neutral text colors — theme-invariant absolutes for the picker's NEUTRALS
+     row. White is the natural emphasis ink on the dark default theme; black on
+     the light theme. Kept out of the 6-color status set on purpose.           */
+  --ink-white:#ffffff; --ink-black:#000000;
 
   /* --- motion + focus (tokenized so CC reads the curve, never re-types it) --- */
   --drawer-ease:cubic-bezier(.22,1,.36,1);
@@ -79,6 +89,8 @@
   --border:#232a34;
   --hairline:#38424f;
   --accent:#6f8bb3; --accent-soft:rgba(111,139,179,.16); --on-accent:#0e1116;
+  /* link ink (dark) — #93abd1 on --bg #12161c = 7.8:1 (AAA body-text contrast) */
+  --link:#93abd1;
   --danger:#e5707a;
   --ok:#62c08a;
   --shadow:0 22px 48px -14px rgba(0,0,0,.7);
