@@ -1,5 +1,22 @@
 # Margin — version log
 
+## v0.14.0 (2026-11-04)
+
+Text editor overhaul (bug fixes) + images.
+
+- **New block engine (`editor-engine.js`)** replaces `document.execCommand`'s block commands (`formatBlock`, `insertUnorderedList`, `insertOrderedList`, `indent`), which were the root cause of a family of bugs. The selection is pinned with marker spans, the touched blocks are exploded into *lines* (a paragraph row, a heading, a quote or code row, or a list item, each with kind, level and checked state), the command edits line properties, and the lines are rebuilt into canonical markup. Every command is idempotent.
+- **Fix · heading sizes compounding**: re-applying Title/Heading inside a list item nested `<h1><h1><h1>…`, and since heading sizes are em-based the text grew on every press. Headings in lists now render as one `<li><h2>` (keeping the bullet, per #8), and legacy nested markup heals the next time a style touches it.
+- **Fix · bullets doing weird things**: bullets on paragraphs produced invalid `<p><ul>…</ul></p>`, a bullet typed into a fresh line scrambled text order, and bullets on a checklist shredded it into loose check controls. Lists are now always valid, toggle off like Google Docs, convert cleanly between bullet / numbered / checklist, and join a same-kind list directly above or below.
+- **Fix · checklist on a multi-line selection**: only one block was converted, so lines separated by line breaks were crammed into one item (and the `0/3` meter disagreed with what you saw). Each selected line, including `Shift+Enter` rows, now becomes its own item; converting the old crammed items splits them back apart.
+- **Checklists, deeper**: Tab / Shift+Tab nest sub-tasks (all list kinds), the meter counts sub-tasks, Enter splits an item at the caret (the new item starts unchecked), Enter on an empty item steps out a level, Backspace at the start of an item removes the bullet, and a checked parent no longer strikes through its sub-tasks. The check control is now gutter-positioned (the old flex row laid nested lists out beside the text).
+- **Fix · merges injecting styles**: Backspace/Delete across a block boundary is handled by the editor, so Chrome no longer wraps merged text in `<span style="font-size:1.5em">`-style spans. Injected presentational styles are also stripped live.
+- **Pasting from anywhere**: Google Docs (the `docs-internal-guid` wrapper, `font-weight:700` spans, `#000000` ink), Notion / Docs `li > p`, GitHub task lists (become checklists), H4 to H6 (become Subheading), and semantic wrappers (`section`, `dl`, `figure`, ...) that used to run their text together. Page text colors are dropped (only Margin's six status inks survive a copy between notes), styles become real B/I/U/S tags, and plain text with `- `, `* `, `1. `, `[ ] ` lines becomes real (nested) lists. Multi-line pastes split the current line at the caret (Docs semantics); paragraphs pasted into a list become items. Pastes into a code block stay plain text.
+- **Undo / redo owned by the editor**: snapshot history (`⌘Z`, `⌘⇧Z`, `Ctrl+Y`, and the Edit menu) so block edits, pastes and image inserts undo cleanly. Typing is grouped by pauses; image data is interned so history stays light even in screenshot-heavy notes.
+- **Images in**: paste screenshots / copied images, drag files from the desktop, drag images straight off a web page, the Image block (now multi-select), and a new right-click **Save image to Margin** on any web image (with a source citation). Remote images, including those inside pasted HTML, are fetched and stored in the note. Screenshots stay lossless PNG up to 2400px (WebP 0.92 if heavy), photos JPEG 0.88, GIF/SVG untouched.
+- **Images out**: hover tools (Copy as PNG, Download) on a legible frosted pill, click-to-select then `⌘C`/`⌘X`, drag-out to the desktop or a folder as a real file (`DownloadURL`), and Chrome's native Save image as.
+- **Reset text color** now removes the color instead of painting the current theme's ink (which went wrong after a theme switch).
+- **Markdown export** now nests sub-lists, keeps headings inside items, and includes images.
+
 ## v0.13.1 — 2026-07-09
 
 - **"Connect this page" chip now leads the row** — the quick-connect chip moves to the front of the connected-pages chip row (before the source chips) so it's the first thing in the band and stays pinned at the left as the row scrolls.

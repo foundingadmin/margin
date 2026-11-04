@@ -514,3 +514,49 @@ a.conn-row-url:hover { color:var(--accent); }
 
 /* hidden attribute must always win over class display rules */
 [hidden] { display:none !important; }
+
+/* ---------- v0.14 · block engine: lists, checklists, headings-in-lists ---------- */
+/* A heading inside a list item keeps the bullet and takes the heading's scale (#8),
+   without the heading's own block margins pushing the item apart. */
+.editor li > h1, .editor li > h2, .editor li > h3 { margin:0; }
+/* nested list markers step through the usual hierarchy */
+.editor ul ul { list-style-type:circle; }
+.editor ul ul ul { list-style-type:square; }
+.editor ol ol { list-style-type:lower-alpha; }
+.editor ol ol ol { list-style-type:lower-roman; }
+.editor li > ul, .editor li > ol { margin:.15em 0; }
+/* Checklist items are plain blocks with the check control pinned in a left gutter
+   (was display:flex, which laid nested sub-lists out *beside* the text). */
+.editor ul.checklist { list-style:none; padding-left:2px; }
+.editor ul.checklist > li { display:block; position:relative; padding-left:26px; }
+.editor ul.checklist > li > .check { position:absolute; left:0; top:calc(.8em - 8px); margin:0; -webkit-user-select:none; user-select:none; }
+.editor ul.checklist > li > h1 + *, .editor ul.checklist > li > h2 + * { margin-top:0; }
+.editor ul.checklist > li:has(> h1) > .check { top:calc(.94em - 8px); }
+.editor ul.checklist > li:has(> h2) > .check { top:calc(.81em - 8px); }
+/* nested lists inside a list item (checklist or not) */
+.editor ul.checklist ul.checklist { padding-left:0; margin:.15em 0; }
+/* only the outermost checklist shows the done/total meter; it counts nested sub-tasks too */
+.editor li ul.checklist[data-count]::before { display:none; }
+/* a checked item strikes its own text, not its sub-tasks (an inline-block isn't decorated) */
+.editor ul.checklist > li.checked > ul, .editor ul.checklist > li.checked > ol { display:inline-block; width:100%; vertical-align:top; color:var(--ink); }
+/* margin-numbers: a checklist's items start 2px in (bullets start 1.4em in), so shift its
+   n.x numerals by the difference to keep one clean gutter column */
+.editor.numbered > ul.checklist > li::before { left:calc(-62px + 1.4em); }
+
+/* ---------- v0.14 · images ---------- */
+.editor > img, .editor .callout-body > img, .editor .toggle-body > img, .editor td > img { display:block; }
+.editor img { height:auto; cursor:default; transition:box-shadow .12s ease; }
+.editor img:hover { box-shadow:0 0 0 2px var(--accent-soft); }
+/* Hover tools: the lock/pill-toggle pattern on a solid backing so both buttons stay
+   legible over any image: dark, light, busy, or full of text. */
+.img-tools { position:absolute; z-index:30; display:flex; gap:4px; padding:3px; border-radius:10px;
+  background:color-mix(in srgb, var(--chrome) 90%, transparent); border:1px solid var(--border);
+  box-shadow:0 2px 10px rgba(0,0,0,.28); -webkit-backdrop-filter:blur(6px); backdrop-filter:blur(6px); }
+.img-tools[hidden] { display:none; }
+.img-tools button { appearance:none; border:1px solid transparent; background:transparent; color:var(--ink); width:28px; height:28px;
+  border-radius:7px; display:grid; place-items:center; cursor:pointer; }
+.img-tools button:hover { background:var(--accent-soft); border-color:color-mix(in srgb, var(--accent) 32%, transparent); color:var(--accent); }
+.img-tools button:focus-visible { outline:2px solid var(--accent); outline-offset:1px; }
+.img-tools svg { width:15px; height:15px; }
+/* drop target: a dashed accent frame around the note while something is dragged in */
+#view-editor.drop-on .editor { outline:2px dashed color-mix(in srgb, var(--accent) 60%, transparent); outline-offset:-6px; border-radius:var(--radius-sm); }

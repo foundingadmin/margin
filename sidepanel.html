@@ -208,7 +208,12 @@
       <div id="size-menu" class="menu size-menu" hidden></div>
       <div id="color-pop" class="menu color-pop" hidden></div>
       <div id="slash" class="slash-menu" hidden></div>
-      <input id="image-input" type="file" accept="image/*" hidden />
+      <input id="image-input" type="file" accept="image/*" multiple hidden />
+      <!-- image hover tools: floated over the hovered image (never part of the note markup) -->
+      <div id="img-tools" class="img-tools" role="toolbar" aria-label="Image actions" hidden>
+        <button data-img-act="copy" title="Copy image" aria-label="Copy image"><svg viewBox="0 0 24 24"><use href="#i-copy"/></svg></button>
+        <button data-img-act="download" title="Download image" aria-label="Download image"><svg viewBox="0 0 24 24"><use href="#i-download"/></svg></button>
+      </div>
     </section>
 
     <!-- ===================== BROWSER (home) ===================== -->
@@ -270,6 +275,8 @@
     </div>
 
   </div>
+  <script src="editor-engine.js"></script>
+  <script src="images.js"></script>
   <script src="sidepanel.js"></script>
 </body>
 </html>

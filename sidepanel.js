@@ -240,7 +240,13 @@ function setStatus(t, state) {
   const lbl = $("save-label"); if (lbl) lbl.textContent = t;
 }
 function activeNote() { return state.notes.find((x) => x.id === state.activeId); }
-function ensureCssMode() { if (!cssModeSet) { try { document.execCommand("styleWithCSS", false, true); } catch (e) {} cssModeSet = true; } }
+function ensureCssMode() {
+  if (cssModeSet) return;
+  try { document.execCommand("styleWithCSS", false, true); } catch (e) {}
+  // Enter makes <p>, never <div>: one block vocabulary for the line engine (editor-engine.js).
+  try { document.execCommand("defaultParagraphSeparator", false, "p"); } catch (e) {}
+  cssModeSet = true;
+}
 function openNote(id) {
   const n = state.notes.find((x) => x.id === id); if (!n) return;
   hideToast();
@@ -249,6 +255,7 @@ function openNote(id) {
   $("title").value = n.title || "";
   editor.innerHTML = sanitizeHtml(n.html || "");
   updateChecklistCounts();
+  histReset(); hideImgTools(true);
   editor.classList.toggle("numbered", !!n.numbered);
   editor.classList.toggle("show-prov", !!n.showProv);
   syncNoteMenu();
@@ -620,27 +627,34 @@ function caretInto(node) { const s = window.getSelection(); const r = document.c
 function caretIntoEnd(node) { const s = window.getSelection(); const r = document.createRange(); r.selectNodeContents(node); r.collapse(false); s.removeAllRanges(); s.addRange(r); editor.focus(); }
 function caretAfter(node) { const s = window.getSelection(); const r = document.createRange(); r.setStartAfter(node); r.collapse(true); s.removeAllRanges(); s.addRange(r); editor.focus(); }
 function insertBlock(node, focusEl) {
+  histFlush();
   const block = currentBlock();
   if (block) {
     const empty = block.textContent.trim() === "" && !block.querySelector("img,hr,table");
     if (empty) block.replaceWith(node); else block.after(node);
   } else editor.appendChild(node);
   const trailing = para(); node.after(trailing);
-  caretInto(focusEl || trailing); queueSave();
+  caretInto(focusEl || trailing); queueSave(); histCommit();
 }
 function insertInline(node) {
   const s = window.getSelection(); let r;
   if (s.rangeCount && editor.contains(s.anchorNode)) r = s.getRangeAt(0); else { r = document.createRange(); r.selectNodeContents(editor); r.collapse(false); }
-  r.deleteContents(); r.insertNode(node); caretAfter(node);
+  histFlush(); r.deleteContents(); r.insertNode(node); caretAfter(node); histCommit();
 }
 
 /* ---------- inline formatting / color / badge ---------- */
-function exec(cmd) { focusEditor(); if (cmd === "createLink") return addLink(); document.execCommand(cmd, false, null); queueSave(); syncToolbar(); }
+const LIST_CMD = { insertUnorderedList: "ul", insertOrderedList: "ol", checklist: "check" };
+function exec(cmd) {
+  focusEditor();
+  if (cmd === "createLink") return addLink();
+  if (LIST_CMD[cmd]) return toggleList(LIST_CMD[cmd]); // block engine, not execCommand (see editor-engine.js)
+  histFlush(); document.execCommand(cmd, false, null); queueSave(); syncToolbar(); histCommit();
+}
 function addLink() {
   focusEditor();
   const sel = window.getSelection(); const has = sel && !sel.isCollapsed;
   const url = prompt("Link URL:", "https://"); if (!url) return;
-  if (has) document.execCommand("createLink", false, url);
+  if (has) { histFlush(); document.execCommand("createLink", false, url); histCommit(); }
   else { const a = elc("a"); a.href = url; a.textContent = url; insertInline(a); }
   queueSave(); syncToolbar();
 }
@@ -649,15 +663,32 @@ function addLink() {
 // this file holds no editor-color literals and the palette re-themes with tokens.
 function tokenHex(name) { return getComputedStyle(document.body).getPropertyValue(name).trim(); }
 function statusHex(key) { return tokenHex("--status-" + key); }
-function applyColor(color) { focusEditor(); if (color) document.execCommand("foreColor", false, color); queueSave(); }
+function applyColor(color) { focusEditor(); histFlush(); if (color) document.execCommand("foreColor", false, color); queueSave(); histCommit(); }
+// "Reset text color" REMOVES the color (it used to paint the current theme's ink, which then went
+// wrong after a theme switch). Paint a sentinel color, then strip exactly that color back out.
+const RESET_SENTINEL = "rgb(1, 2, 3)";
+function resetColor() {
+  focusEditor(); histFlush();
+  const sel = window.getSelection(); if (!sel.rangeCount || sel.isCollapsed) return;
+  document.execCommand("foreColor", false, "#010203");
+  editor.querySelectorAll("[style]").forEach((el) => {
+    if (el.style.color !== RESET_SENTINEL) return;
+    el.style.removeProperty("color");
+    if (!el.getAttribute("style")) el.removeAttribute("style");
+    if (el.tagName === "SPAN" && !el.attributes.length) unwrap(el);
+  });
+  editor.querySelectorAll("font[color]").forEach((f) => { if (normColor(f.getAttribute("color")) === RESET_SENTINEL) unwrap(f); });
+  queueSave(); histCommit();
+}
 function applyBadge(key) {
   focusEditor();
   const hex = statusHex(key);
   const sel = window.getSelection();
   const span = elc("span", "badge"); span.style.color = hex; span.style.backgroundColor = rgbaFromHex(hex, 0.16);
+  histFlush();
   if (sel && !sel.isCollapsed) { const txt = sel.toString(); span.textContent = txt; const r = sel.getRangeAt(0); r.deleteContents(); r.insertNode(span); caretAfter(span); }
   else { span.textContent = "Label"; insertInline(span); }
-  queueSave();
+  queueSave(); histCommit();
 }
 // Soft same-hue fill for badges: the resolved status hex at low alpha.
 function rgbaFromHex(hex, a) {
@@ -679,14 +710,20 @@ function buildStyleMenu() {
   const m = $("style-menu"); m.innerHTML = "";
   STYLES.forEach((s) => { const b = elc("button"); b.dataset.tag = s.tag; b.innerHTML = `<span class="${s.cls}">${s.label}</span>`; b.addEventListener("click", () => { applyStyle(s.tag); m.hidden = true; }); m.appendChild(b); });
 }
-function applyStyle(tag) { focusEditor(); document.execCommand("formatBlock", false, tag); setStyleLabel(tag); queueSave(); syncToolbar(); }
+// Block styles go through the line engine: idempotent, list-aware, multi-line (editor-engine.js).
+function applyStyle(tag) { focusEditor(); setBlockStyle(tag); setStyleLabel(tag); }
 function setStyleLabel(tag) { const s = STYLES.find((x) => x.tag === tag) || STYLES[0]; $("style-current").textContent = s.label; }
 function syncToolbar() {
   try {
-    ["bold","italic","underline","strikeThrough","insertUnorderedList","insertOrderedList"].forEach((cmd) => {
+    ["bold","italic","underline","strikeThrough"].forEach((cmd) => {
       const btn = document.querySelector('.rt-toolbar [data-cmd="' + cmd + '"]'); if (btn) btn.classList.toggle("active", document.queryCommandState(cmd));
     });
-    let block = (document.queryCommandValue("formatBlock") || "").toUpperCase();
+    const info = caretLineInfo() || { list: null, block: "P" };
+    const lb = (sel, on) => { const b = document.querySelector(sel); if (b) b.classList.toggle("active", on); };
+    lb('.rt-toolbar [data-cmd="insertUnorderedList"]', info.list === "ul");
+    lb('.rt-toolbar [data-cmd="insertOrderedList"]', info.list === "ol");
+    lb("#checklist-btn", info.list === "check");
+    let block = info.block;
     if (!["H1","H2","H3","BLOCKQUOTE","PRE"].includes(block)) block = "P";
     setStyleLabel(block);
     $("style-menu").querySelectorAll("button").forEach((b) => b.classList.toggle("sel", b.dataset.tag === block));
@@ -720,38 +757,19 @@ function setTextSize(k) {
 
 /* ---------- checklist ---------- */
 function checkSpan() { const c = elc("span", "check"); c.contentEditable = "false"; return c; }
-function makeChecklist() {
-  focusEditor();
-  const block = currentBlock();
-  const ul = elc("ul", "checklist"); const li = elc("li"); li.appendChild(checkSpan());
-  if (block && block.textContent.trim() !== "") { while (block.firstChild) li.appendChild(block.firstChild); } else li.appendChild(br());
-  ul.appendChild(li);
-  if (block) block.replaceWith(ul); else editor.appendChild(ul);
-  if (!ul.nextSibling) ul.after(para());
-  updateChecklistCounts();
-  caretIntoEnd(li); queueSave();
-}
-function currentChecklistLi() {
-  let n = window.getSelection().anchorNode; if (!n) return null;
-  while (n && n !== editor) { if (n.tagName === "LI" && n.parentNode && n.parentNode.classList && n.parentNode.classList.contains("checklist")) return n; n = n.parentNode; }
-  return null;
-}
+function makeChecklist() { focusEditor(); return toggleList("check"); }
 function currentListItem() {
   let n = window.getSelection().anchorNode; if (!n) return null;
   while (n && n !== editor) { if (n.nodeType === 1 && n.tagName === "LI") return n; n = n.parentNode; }
   return null;
 }
+// The meter counts every checklist item in the list, nested sub-tasks included (nested meters are hidden in CSS).
 function updateChecklistCounts() {
   editor.querySelectorAll("ul.checklist").forEach((ul) => {
-    const items = ul.querySelectorAll(":scope > li");
-    const done = ul.querySelectorAll(":scope > li.checked").length;
+    const items = [ul, ...ul.querySelectorAll("ul.checklist")].flatMap((l) => [...l.children].filter((li) => li.tagName === "LI"));
+    const done = items.filter((li) => li.classList.contains("checked")).length;
     if (items.length) ul.setAttribute("data-count", done + "/" + items.length); else ul.removeAttribute("data-count");
   });
-}
-function handleChecklistEnter() {
-  const li = currentChecklistLi(); if (!li) return false;
-  if (li.textContent.trim() === "") { const ul = li.parentNode; const p = para(); ul.after(p); li.remove(); if (!ul.querySelector("li")) ul.remove(); else updateChecklistCounts(); caretInto(p); queueSave(); return true; }
-  const nli = elc("li"); nli.appendChild(checkSpan()); nli.appendChild(br()); li.after(nli); updateChecklistCounts(); caretIntoEnd(nli); queueSave(); return true;
 }
 
 /* ---------- element library (slash + "+") ---------- */
@@ -770,18 +788,6 @@ let savedRange = null;
 function saveRange() { const s = window.getSelection(); if (s.rangeCount && editor.contains(s.anchorNode)) savedRange = s.getRangeAt(0).cloneRange(); }
 function restoreRange() { if (savedRange) { const s = window.getSelection(); s.removeAllRanges(); s.addRange(savedRange); } }
 function elImage() { saveRange(); $("image-input").value = ""; $("image-input").click(); }
-function downscale(img) {
-  const max = 1280; let w = img.naturalWidth, h = img.naturalHeight;
-  if (w > max || h > max) { const s = Math.min(max / w, max / h); w = Math.round(w * s); h = Math.round(h * s); }
-  const c = elc("canvas"); c.width = w; c.height = h; c.getContext("2d").drawImage(img, 0, 0, w, h);
-  try { return c.toDataURL("image/jpeg", 0.85); } catch (e) { return img.src; }
-}
-function handleImageFile(file) {
-  if (!file || !/^image\//.test(file.type)) return;
-  const reader = new FileReader();
-  reader.onload = () => { const img = new Image(); img.onload = () => { const im = elc("img"); im.src = downscale(img); restoreRange(); insertBlock(im); }; img.src = reader.result; };
-  reader.readAsDataURL(file);
-}
 function buildLinkCard(meta, loading) {
   const a = elc("a", "link-card" + (loading ? " loading" : "")); a.href = meta.url; a.target = "_blank"; a.rel = "noopener noreferrer"; a.contentEditable = "false";
   const body = elc("div", "lc-body");
@@ -919,7 +925,7 @@ function buildPopovers() {
   const reset = elc("button", "color-reset");
   reset.appendChild(svgUse("rotate-ccw", "color-reset-ic"));
   reset.appendChild(Object.assign(elc("span"), { textContent: "Reset text color" }));
-  reset.addEventListener("mousedown", (e) => { e.preventDefault(); applyColor(tokenHex("--ink-reset")); cp.hidden = true; });
+  reset.addEventListener("mousedown", (e) => { e.preventDefault(); resetColor(); cp.hidden = true; });
   cp.appendChild(reset);
 }
 function closeAllPopovers() {
@@ -1079,6 +1085,7 @@ async function consumePendingCapture() {
     setStatus("No selection on the page", "error"); setTimeout(() => setStatus("Saved"), 1600); return false;
   }
   if (!cap.html) return false;
+  if (cap.mode === "image") cap.html = await localizeHtml(cap.html); // keep a local copy, not a hotlink
 
   // paste-from-page (#5) always lands in the note you're looking at; right-click capture obeys the
   // lock (locked -> the open/last note; unlocked -> resolve by the captured page).
@@ -1094,8 +1101,7 @@ async function consumePendingCapture() {
     // Inserting into the note you're looking at — drop it at the last caret, not the end (B5).
     editor.focus();
     if (!restoreCaptureCaret()) caretIntoEnd(editor);
-    document.execCommand("insertHTML", false, sanitizeHtml(cap.html));
-    updateChecklistCounts(); queueSave();
+    insertHtmlAtCaret(cap.html, { merge: false }); // engine insert (clean blocks, undoable); remote images localize after
   } else {
     target.html = (target.html && target.html.trim() ? target.html : "") + cap.html;
     target.updatedAt = now();
@@ -1118,29 +1124,26 @@ function onKeydown(e) {
   // B2: inside a list, Tab/Shift-Tab indents/outdents instead of moving focus to the next
   // focusable element (a toggle's <summary>), which is what made it "jump to a far-off block".
   if (inEditor && e.key === "Tab" && !meta && !e.altKey) {
-    const li = currentListItem();
-    if (li) {
-      e.preventDefault();
-      // Checklist nesting isn't modelled yet; still swallow Tab so it can't leap focus away.
-      if (!(li.parentNode && li.parentNode.classList && li.parentNode.classList.contains("checklist"))) {
-        document.execCommand(e.shiftKey ? "outdent" : "indent");
-        queueSave(); syncToolbar();
-      }
-      return;
-    }
+    if (currentListItem()) { e.preventDefault(); indentLines(e.shiftKey ? -1 : 1); return; } // all list kinds nest, checklists included
   }
-  // ⌘]/⌘[ — indent / outdent (works on lists and plain text alike).
+  // ⌘]/⌘[ indent / outdent: list items nest; plain text gets a left indent.
   if (inEditor && meta && !e.shiftKey && !e.altKey && (e.code === "BracketRight" || e.code === "BracketLeft")) {
     e.preventDefault(); focusEditor();
-    document.execCommand(e.code === "BracketRight" ? "indent" : "outdent");
-    queueSave(); syncToolbar(); return;
+    if (currentListItem()) { indentLines(e.code === "BracketRight" ? 1 : -1); return; }
+    histFlush(); document.execCommand(e.code === "BracketRight" ? "indent" : "outdent");
+    queueSave(); syncToolbar(); histCommit(); return;
   }
+  // Undo / redo are the editor's own history (block edits are invisible to the browser's undo).
+  if (inEditor && meta && !e.altKey && e.key.toLowerCase() === "z") { e.preventDefault(); return e.shiftKey ? redo() : undo(); }
+  if (inEditor && e.ctrlKey && !e.metaKey && !e.shiftKey && e.key.toLowerCase() === "y") { e.preventDefault(); return redo(); }
   if (inEditor && e.altKey && meta && /^Digit[0-3]$/.test(e.code)) { e.preventDefault(); applyStyle({ Digit0: "P", Digit1: "H1", Digit2: "H2", Digit3: "H3" }[e.code]); return; }
   if (inEditor && meta && e.shiftKey && e.code === "Digit8") { e.preventDefault(); return exec("insertUnorderedList"); }
   if (inEditor && meta && e.shiftKey && e.code === "Digit7") { e.preventDefault(); return exec("insertOrderedList"); }
   if (inEditor && meta && e.shiftKey && e.code === "Digit9") { e.preventDefault(); return makeChecklist(); }
   if (inEditor && meta && !e.shiftKey && e.key.toLowerCase() === "k") { e.preventDefault(); return addLink(); }
-  if (inEditor && e.key === "Enter" && !e.shiftKey && !meta) { if (handleChecklistEnter()) { e.preventDefault(); return; } }
+  if (inEditor && e.key === "Enter" && !e.shiftKey && !meta && !e.altKey && !e.isComposing) { if (listEnter()) { e.preventDefault(); return; } histFlush(); }
+  if (inEditor && e.key === "Backspace" && !meta && !e.altKey && !e.shiftKey && !e.isComposing) { if (handleBackspace(e)) return; }
+  if (inEditor && e.key === "Delete" && !meta && !e.altKey && !e.shiftKey && !e.isComposing) { if (handleDelete(e)) return; }
   if (isEditorView() && meta && e.key === "Enter") { e.preventDefault(); return newNote(); }
   if (!isEditorView() && e.key === "Escape") { e.preventDefault(); return showEditor(); }
   if (isEditorView() && meta && e.key.toLowerCase() === "s") { e.preventDefault(); saveNotes(); flashSaved(); return; }
@@ -1151,13 +1154,27 @@ const GUIDE_HTML = `
 <p class="lead">A fast, tab-aware notepad in your side panel. Open or close it anytime with <kbd>⌘/Ctrl + Shift + E</kbd> (rebindable below).</p>
 <h2>Blocks &amp; the slash menu</h2>
 <p>Type <code>/</code> anywhere for the element grid, or hit the <strong>/ cmd</strong> chip in the toolbar. Partial names work — <code>/cod</code> + <kbd>Enter</kbd> drops a code block, <code>/ban</code> a callout. Arrows move, <kbd>Enter</kbd> or <kbd>Tab</kbd> inserts.</p>
-<p>Available: Title / Heading / Subheading, bullet · numbered · checklist, quote, divider, callout, toggle, code, image (uploaded &amp; downscaled, stored locally), link card (pulls a page's title/description/image), and table.</p>
+<p>Available: Title / Heading / Subheading, bullet · numbered · checklist, quote, divider, callout, toggle, code, image (stored locally; you can also just paste or drop one), link card (pulls a page's title/description/image), and table.</p>
 <h2>Text styling</h2>
 <ul>
 <li>The <strong>style menu</strong> previews each option in its real style.</li>
 <li><strong>B / I / U / S</strong>, text color, and a ClickUp-style <strong>badge</strong> (select text → pick a color).</li>
 <li><strong>Text size</strong> — the sizer beside the style menu (Small / Regular / Large / Supersize) scales the whole note evenly. It's a sticky setting, not per-selection formatting.</li>
-<li><strong>Checklist</strong>: hollow circles with a live count at the top; click a circle to check it — the line goes muted and struck through.</li>
+<li><strong>Styles apply per line.</strong> Select several lines and pick a style: each line gets it. Applying the same style twice changes nothing.</li>
+</ul>
+<h2>Lists &amp; checklists</h2>
+<ul>
+<li>Select lines (separate paragraphs or lines split by <kbd>Shift+Enter</kbd>) and press a list button or shortcut: <strong>every line becomes its own item</strong>. Press it again to turn the list back into plain lines.</li>
+<li><strong>Checklist</strong>: hollow circles with a live <code>done/total</code> count at the top (sub-tasks included). Click a circle to check it.</li>
+<li><kbd>Tab</kbd> / <kbd>⇧Tab</kbd> nest and un-nest items in every list type, checklists included. <kbd>Enter</kbd> on an empty item steps out a level (or out of the list); <kbd>Backspace</kbd> at the start of an item removes its bullet.</li>
+<li>A heading applied inside a list keeps the bullet and takes the heading's size.</li>
+</ul>
+<h2>Pasting</h2>
+<p>Pasted text is cleaned into Margin's own styles: bold, italic, links, headings and lists from Google Docs, Notion, GitHub or any web page come through, while a page's fonts, sizes and text colors are dropped (they'd be unreadable in the other theme). Plain text with <code>- </code>, <code>1. </code> or <code>[ ] </code> lines becomes real lists and checklists. <strong>⌘/Ctrl + Z</strong> undoes a paste in one step.</p>
+<h2>Images</h2>
+<ul>
+<li><strong>In:</strong> paste a screenshot or copied image (<kbd>⌘/Ctrl + V</kbd>), drag files from your desktop, drag an image straight off any web page, or right-click an image on a page → <strong>Save image to Margin</strong>. Every image is saved <em>inside</em> the note, so it survives the page changing.</li>
+<li><strong>Out:</strong> hover an image for <strong>Copy</strong> and <strong>Download</strong>. Click an image, then <kbd>⌘/Ctrl + C</kbd> to copy the picture itself. Drag it out of the panel onto the desktop or a folder, or right-click → <strong>Save image as…</strong>.</li>
 </ul>
 <h2>Margin Numbers</h2>
 <p>From a note's <strong>actions</strong> menu, switch on <strong>Margin Numbers</strong> to number every block down a faint left gutter — top-level blocks <code>1, 2, 3</code>, with list items and table rows as <code>12.1, 12.2</code>. They're a live positional reference, not a permanent ID, so they renumber as you write. Per-note, off by default.</p>
@@ -1167,6 +1184,7 @@ const GUIDE_HTML = `
 <li>Body text — <kbd>⌥⌘ / Alt+Ctrl + 0</kbd></li>
 <li>Bulleted / numbered / checklist — <kbd>⌘/Ctrl + Shift + 8 / 7 / 9</kbd></li>
 <li>Indent / outdent — <kbd>Tab</kbd> / <kbd>⇧Tab</kbd> in a list, or <kbd>⌘/Ctrl + ]</kbd> / <kbd>[</kbd> anywhere</li>
+<li>Undo / redo: <kbd>⌘/Ctrl + Z</kbd> / <kbd>⌘/Ctrl + Shift + Z</kbd></li>
 <li>Link selected text — <kbd>⌘/Ctrl + K</kbd></li>
 <li>New note — <kbd>⌘/Ctrl + Enter</kbd> · Save now — <kbd>⌘/Ctrl + S</kbd></li>
 <li>Paste page selection into the open note — <kbd>⌘/Ctrl + Shift + Y</kbd></li>
@@ -1187,6 +1205,14 @@ const GUIDE_HTML = `
 <p>Notes live locally via <code>chrome.storage.local</code> and never leave your machine. Broad host access exists only so link cards can fetch a URL's preview; no scripts run on pages.</p>
 `;
 const CHANGELOG_HTML = `
+<div class="ver"><span class="ver-tag">v0.14.0</span><span class="ver-date">Nov 4, 2026</span></div>
+<ul>
+<li><strong>Text styles you can trust</strong>: re-applying Title or Heading no longer keeps growing the text, bullets no longer scramble the layout, and every style is applied line by line, so selecting three lines and pressing a style or list gives you three styled lines.</li>
+<li><strong>Checklists, fixed</strong>: selected lines become one checkbox each, the count matches what you see, sub-tasks nest with <kbd>Tab</kbd>, and <kbd>Enter</kbd> splits an item at the cursor.</li>
+<li><strong>Cleaner pasting</strong> from Google Docs, Notion, GitHub and the web: structure and emphasis kept, page fonts and colors dropped, plain-text bullets turned into real lists.</li>
+<li><strong>Images</strong>: paste screenshots, drop files or images from any page, or right-click a web image → Save image to Margin. Get them back out with hover Copy / Download, <kbd>⌘C</kbd>, drag-to-desktop, or Save image as…</li>
+<li><strong>Undo that covers everything</strong>: <kbd>⌘Z</kbd> now reliably undoes list, style and paste changes too.</li>
+</ul>
 <div class="ver"><span class="ver-tag">v0.10.0</span><span class="ver-date">Jun 29, 2026</span></div>
 <ul>
 <li><strong>Paste-from-page</strong> — select text on any page and hit <kbd>⌘/Ctrl + Shift + Y</kbd> to drop it into the note you're <strong>currently viewing</strong>, right at your cursor, tagged with the page it came from. Unlike right-click capture (which makes a quote), this is a plain paste — and because it reads the live page, the source is <strong>certain</strong>.</li>
@@ -1369,16 +1395,18 @@ function bind() {
 
   $("title-edit").addEventListener("click", () => { const t = $("title"); t.focus(); t.select(); });
   $("title").addEventListener("input", queueSave);
-  editor.addEventListener("input", () => { updateChecklistCounts(); queueSave(); checkSlash(); });
+  editor.addEventListener("input", () => { normalizeLive(); updateChecklistCounts(); queueSave(); checkSlash(); histTyping(); });
+  editor.addEventListener("beforeinput", (e) => {
+    if (e.inputType === "historyUndo") { e.preventDefault(); undo(); }
+    else if (e.inputType === "historyRedo") { e.preventDefault(); redo(); }
+  });
+  editor.addEventListener("mousedown", histFlush); // a caret jump ends the current typing group
   editor.addEventListener("focus", ensureCssMode);
   editor.addEventListener("keyup", (e) => { if (["ArrowLeft","ArrowRight","ArrowUp","ArrowDown"].includes(e.key)) checkSlash(); });
-  editor.addEventListener("paste", (e) => {
-    e.preventDefault(); const html = e.clipboardData.getData("text/html"), text = e.clipboardData.getData("text/plain");
-    if (html) document.execCommand("insertHTML", false, sanitizeHtml(html)); else document.execCommand("insertText", false, text);
-  });
+  editor.addEventListener("paste", onEditorPaste); // editor-engine.js: cleans, converts lists, takes images
   editor.addEventListener("click", (e) => {
     const c = e.target.closest && e.target.closest(".check");
-    if (c && editor.contains(c)) { const li = c.closest("li"); if (li) { li.classList.toggle("checked"); updateChecklistCounts(); queueSave(); } return; }
+    if (c && editor.contains(c)) { const li = c.closest("li"); if (li) { histFlush(); li.classList.toggle("checked"); updateChecklistCounts(); queueSave(); histCommit(); } return; }
     // Links inside a contenteditable don't navigate — a click just drops the caret. Open them
     // ourselves so citation links and inline links are actually active.
     const a = e.target.closest && e.target.closest("a[href]");
@@ -1394,6 +1422,7 @@ function bind() {
   // toolbar commands
   document.querySelectorAll('.rt-toolbar [data-cmd]').forEach((b) => b.addEventListener("click", () => exec(b.dataset.cmd)));
   $("checklist-btn").addEventListener("click", makeChecklist);
+  bindImages();
   $("mn-toggle").addEventListener("click", (e) => { e.stopPropagation(); toggleMarginNumbers(); focusEditor(); });
   $("plus-btn").addEventListener("click", (e) => { e.stopPropagation(); focusEditor(); slashCtx = null; showSlash(""); });
   $("color-btn").addEventListener("click", (e) => { e.stopPropagation(); saveRange(); openPopover("color-pop", $("color-btn")); });
@@ -1406,7 +1435,7 @@ function bind() {
   $("connect-current").addEventListener("click", () => { const n = activeNote(); if (n) connectCurrentPage(n); });
   $("connect-custom").addEventListener("click", () => { const n = activeNote(); if (n) addCustomUrl(n); });
 
-  $("image-input").addEventListener("change", (e) => { const f = e.target.files && e.target.files[0]; if (f) handleImageFile(f); });
+  $("image-input").addEventListener("change", (e) => { const fs = [...(e.target.files || [])]; if (fs.length) { focusEditor(); restoreRange(); insertImageFiles(fs); } });
 
   $("search").addEventListener("input", (e) => { state.query = e.target.value; renderList(); });
   $("select-toggle").addEventListener("click", () => setSelectMode(!state.selectMode));
@@ -1471,21 +1500,26 @@ function htmlToMarkdown(html) {
       else if (t === "A") out += `[${inner}](${c.getAttribute("href") || ""})`;
       else if (t === "CODE") out += `\`${inner}\``;
       else if (t === "BR") out += "\n";
+      else if (t === "IMG") out += `![${(c.getAttribute("alt") || "image").replace(/[\[\]]/g, "")}](${c.getAttribute("src") || ""})`;
       else out += inner; // U and any other wrapper: pass text through
     });
     return out;
   };
   const lines = [];
-  const emitList = (el, ordered) => {
+  // Lists recurse: nested items indent two spaces per level; a heading inside an item keeps its text.
+  const emitList = (el, ordered, depth = 0) => {
     const checklist = el.classList.contains("checklist");
     let i = 0;
     [...el.children].forEach((li) => {
+      if (li.tagName === "UL" || li.tagName === "OL") { emitList(li, li.tagName === "OL", depth + 1); return; }
       if (li.tagName !== "LI") return;
       i++;
       const mark = checklist ? (li.classList.contains("checked") ? "- [x] " : "- [ ] ") : (ordered ? `${i}. ` : "- ");
-      lines.push(mark + inline(li).trim());
+      const body = elc("div"); [...li.childNodes].forEach((c) => { if (!(c.nodeType === 1 && (c.tagName === "UL" || c.tagName === "OL"))) body.appendChild(c.cloneNode(true)); });
+      lines.push("  ".repeat(depth) + mark + inline(body).trim().replace(/\n/g, " "));
+      [...li.children].forEach((c) => { if (c.tagName === "UL" || c.tagName === "OL") emitList(c, c.tagName === "OL", depth + 1); });
     });
-    lines.push("");
+    if (!depth) lines.push("");
   };
   [...root.children].forEach((el) => {
     const t = el.tagName;
@@ -1496,6 +1530,7 @@ function htmlToMarkdown(html) {
     else if (t === "BLOCKQUOTE") lines.push("> " + inline(el).trim().replace(/\n/g, "\n> "), "");
     else if (t === "PRE") lines.push("```", (el.textContent || "").replace(/\n$/, ""), "```", "");
     else if (t === "HR") lines.push("---", "");
+    else if (t === "IMG") lines.push(`![${(el.getAttribute("alt") || "image").replace(/[\[\]]/g, "")}](${el.getAttribute("src") || ""})`, "");
     else { const s = inline(el).trim(); if (s) lines.push(s, ""); }
   });
   return lines.join("\n").replace(/\n{3,}/g, "\n\n").trim() + "\n";
