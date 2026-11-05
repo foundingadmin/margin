@@ -5,7 +5,8 @@
 # with the `main` branch on GitHub:
 #   • first run  → clones the repo into the target folder
 #   • every run after → pulls the latest main
-# Then open chrome://extensions and click the reload ↻ on the Margin card.
+# Margin 0.15.0+ notices the new files and reloads itself within about a minute
+# (or as soon as you close its side panel), so there's nothing to click.
 #
 # Target folder defaults to "~/Custom Apps/margin". Override per-run with:
 #   MARGIN_DIR="/some/other/path" ./update-margin.command
@@ -20,6 +21,7 @@ main() {
   local REPO_URL="https://github.com/foundingadmin/margin.git"
   local DEFAULT_TARGET="$HOME/Custom Apps/margin"
   local TARGET="${MARGIN_DIR:-$DEFAULT_TARGET}"
+  local FRESH=0
 
   # If run from inside the Margin checkout, update that checkout in place. Guard hard:
   # adopt the discovered repo ONLY when its origin is foundingadmin/margin. Without this,
@@ -55,18 +57,23 @@ main() {
     echo "⬇️  Cloning Margin into: $TARGET"
     mkdir -p "$(dirname "$TARGET")"
     git clone "$REPO_URL" "$TARGET"
+    FRESH=1
   fi
 
   echo
   echo "✅ Margin is up to date at: $TARGET"
-  echo "👉 Open chrome://extensions and click the reload ↻ on the Margin card."
 
-  # Best-effort: bring the extensions page up in Comet so the reload button is one click
-  # away. Fall back to just launching Comet, then to Chrome, if a step isn't available.
-  open -a "Comet" "chrome://extensions/" 2>/dev/null \
-    || open -a "Comet" 2>/dev/null \
-    || open -a "Google Chrome" "chrome://extensions/" 2>/dev/null \
-    || true
+  if [ "$FRESH" = 1 ]; then
+    # First install: Chrome still has to be pointed at the folder once (Load unpacked).
+    echo "👉 In chrome://extensions turn on Developer mode, click Load unpacked, and pick: $TARGET"
+    open -a "Comet" "chrome://extensions/" 2>/dev/null \
+      || open -a "Google Chrome" "chrome://extensions/" 2>/dev/null \
+      || true
+  else
+    # 0.15.0+ reloads itself when the version on disk changes (deferred while its panel is open).
+    echo "↻ Margin reloads itself within about a minute (or when you close its panel)."
+    echo "   Coming from a version before 0.15.0? Click ↻ on the Margin card in chrome://extensions once."
+  fi
 }
 
 main "$@"

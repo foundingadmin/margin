@@ -1221,6 +1221,11 @@ const GUIDE_HTML = `
 <p>Notes live locally via <code>chrome.storage.local</code> and never leave your machine. Broad host access exists only so link cards can fetch a URL's preview; no scripts run on pages.</p>
 `;
 const CHANGELOG_HTML = `
+<div class="ver"><span class="ver-tag">v0.15.0</span><span class="ver-date">Nov 5, 2026</span></div>
+<ul>
+<li><strong>Updates install themselves</strong>: when a newer Margin lands in its folder, it reloads on its own within about a minute. No more ↻ in the extensions page.</li>
+<li><strong>Never mid-thought</strong>: if the panel is open you get a quiet “ready” notice with <strong>Reload now</strong>; otherwise the update waits until you close the panel. Notes are untouched either way.</li>
+</ul>
 <div class="ver"><span class="ver-tag">v0.14.0</span><span class="ver-date">Nov 4, 2026</span></div>
 <ul>
 <li><strong>Text styles you can trust</strong>: re-applying Title or Heading no longer keeps growing the text, bullets no longer scramble the layout, and every style is applied line by line, so selecting three lines and pressing a style or list gives you three styled lines.</li>
