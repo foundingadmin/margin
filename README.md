@@ -28,7 +28,18 @@ The ⋯ menu → **Set keyboard shortcut…** opens `chrome://extensions/shortcu
 ## The block editor
 Type **`/`** anywhere for the element grid, or hit the **＋** in the toolbar. Partial names work — `/cod` + Enter drops a code block, `/ban` a callout. Arrow keys move, Enter or Tab inserts.
 
-Elements: Title / Heading / Subheading, bullet · numbered · **checklist**, quote, **divider**, **callout** (banner), **toggle** (collapsible), **code**, **image** (uploaded + downscaled, stored locally), **link card** (pulls the page's title/description/image), and **table**.
+Elements: Title / Heading / Subheading, bullet · numbered · **checklist**, quote, **divider**, **callout** (banner), **toggle** (collapsible), **code**, **image** (stored locally in the note), **link card** (pulls the page's title/description/image), and **table**.
+
+### Lines, lists & checklists
+Styles and lists apply **per line**: select three lines (paragraphs or `Shift+Enter` rows), press a style or list, get three styled lines. Re-applying a style is a no-op; a list button toggles the list off again. Tab / Shift+Tab nest items in every list type (checklists too), Enter on an empty item steps out a level, and Backspace at the start of an item drops its bullet. The checklist's `done/total` meter counts sub-tasks. All of this lives in `editor-engine.js` (see the header comment there for the explode → transform → rebuild model).
+
+### Images
+- **In:** paste a screenshot or copied image, drag files from the desktop, drag an image off any web page, or right-click a web image → **Save image to Margin**. Remote images are fetched and stored inside the note (they survive the page changing).
+- **Out:** hover for **Copy** (PNG) / **Download**; click an image then ⌘/Ctrl+C; drag it onto the desktop or a folder; or right-click → Save image as.
+- Storage: long edge capped at 2400px. Screenshots stay lossless PNG (WebP 0.92 if heavy), photos JPEG 0.88, GIF/SVG untouched.
+
+### Pasting
+Pastes are cleaned into Margin's own styles. Google Docs / Notion / GitHub / web structure and emphasis survive; page fonts, sizes and text colors don't (they'd be unreadable in the other theme). Plain-text `- `, `1. `, `[ ] ` lines become real lists. ⌘/Ctrl+Z undoes any paste, list or style change in one step (the editor keeps its own undo history).
 
 ### Text styling
 - **Style menu** (left of the toolbar) — each option previews in its real style.
@@ -43,6 +54,8 @@ Elements: Title / Heading / Subheading, bullet · numbered · **checklist**, quo
 | Bulleted list | ⌘/Ctrl+Shift+**8** |
 | Numbered list | ⌘/Ctrl+Shift+**7** |
 | Checklist | ⌘/Ctrl+Shift+**9** |
+| Indent / outdent list item | **Tab** / **Shift+Tab** (or ⌘/Ctrl+**]** / **[**) |
+| Undo / redo | ⌘/Ctrl+**Z** / ⌘/Ctrl+Shift+**Z** |
 | Link selected text | ⌘/Ctrl+**K** |
 | New note | ⌘/Ctrl+Enter |
 | Save now | ⌘/Ctrl+S (autosaves anyway) |
@@ -66,18 +79,20 @@ New notes are titled `Site · Page · Mon D h:mma` — e.g. `Claude · Margin ex
 ## Privacy & permissions
 Notes are stored locally via `chrome.storage.local` and never leave your machine. Two heavier permissions, both for features you asked for:
 - **`<all_urls>` host access** — only so **link cards** can fetch a URL's Open Graph metadata (title/description/image) from the background worker. No content scripts run on pages; nothing is read unless you paste a link into a card. Sites that block the fetch degrade to a plain link card.
-- **`unlimitedStorage`** — so uploaded images (kept as local data URLs, downscaled to ~1280px) don't bump the default storage cap.
+- **`unlimitedStorage`**: so images (kept as local data URLs, long edge capped at 2400px) don't bump the default storage cap. The same host access lets the panel fetch an image you drop or right-click so a local copy is kept.
 
 ## Files
 - `manifest.json` — MV3 config, commands, permissions.
 - `background.js` — panel toggle, selection capture, link-card metadata fetch.
-- `sidepanel.html / .css / .js` — the editor.
+- `sidepanel.html / .css / .js`: the app shell, views and wiring.
+- `editor-engine.js`: block styles, lists/checklists, Enter/Backspace, paste cleanup, undo history.
+- `images.js`: image paste/drop/capture, storage encoding, copy/download/drag-out.
 - `tokens.css` — design tokens (color/type/radius/shadow); the design-system seam.
 - `docs/DESIGN_INTEGRATION.md` — how a UI design package from Claude Design lands.
 - `icons/` — the mark.
 
 ## Known limits (honest list)
-- Rich-text uses `document.execCommand` — deprecated but still the most reliable contenteditable path in Chrome; if it's ever removed this layer gets swapped.
+- Inline rich text (bold/italic/color) still uses `document.execCommand`; block structure (styles, lists, paste) no longer does (`editor-engine.js`).
 - Table editing is basic (type in cells; no add-row/col UI yet).
 - Link-card previews depend on the target site exposing OG tags and allowing the fetch.
 

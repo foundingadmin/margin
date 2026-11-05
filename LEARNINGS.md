@@ -46,6 +46,20 @@ The side panel's top strip (app name, pin, close) is **Chrome-drawn and uncontro
 
 **Whatever `execCommand` writes inline must be on `STYLE_PROPS`, or it won't survive a save.** With `styleWithCSS` on, `indent`/`outdent` on a *non-list* block writes `margin-left` inline. That's why `⌘]`/`⌘[` indent of plain paragraphs needs `margin-left` whitelisted — list indent changes nesting (no inline style) and was always safe, but the plain-text case silently reverted until the prop was allowed.
 
+**Never use execCommand for block structure** *(v0.14.0)*. `formatBlock`, `insertUnorderedList`/`insertOrderedList` and `indent` don't round-trip: re-applying H1 in a list item nests headings (and em-based sizes compound), bullets wrap paragraphs as `<p><ul>`, and lists convert only the anchor block. Block edits go through `editor-engine.js`: pin the selection with marker spans (they survive any DOM surgery, unlike live Ranges, which collapse when their node is moved), explode the touched blocks into lines, edit line properties, rebuild canonical markup. Inline formatting (bold/italic/color) still uses execCommand; that path is fine.
+
+**Own the undo stack if you touch the DOM directly.** Native undo only knows about execCommand/typing; replaying it over DOM you changed by hand corrupts the note. The editor keeps snapshot history and intercepts `⌘Z`/`⌘⇧Z`/`Ctrl+Y` *and* `beforeinput` `historyUndo`/`historyRedo` (Edit menu, context menu). Snapshots intern image data URLs as short tokens, or a screenshot-heavy note multiplies its size by the stack depth.
+
+**Chrome merges blocks with style spans.** Backspace across `<h1>|<p>` makes `<span style="font-size:1.5em; font-weight:700">`. Handle Backspace/Delete at block edges yourself (move the inline children) and strip non-whitelisted inline styles live after every input.
+
+**The HTML parser rewrites invalid nesting on load.** `<p><ul>` and `<h1><h1>` saved by old execCommand output come back from `innerHTML` as siblings with empty `<p></p>` / `<h1></h1>` husks. Don't rely on stored markup keeping an invalid shape.
+
+**Paste: only Margin's status inks survive.** Google Docs paints every run `color:#000000`, blogs use `#333`; kept, they're invisible on the dark theme. Pasted colors are kept only if they match a `--status-*` token (either theme); presentational weight/italic/underline become real tags.
+
+**Extension pages can read cross-origin image bytes.** With host permission, `fetch()` from the panel isn't CORS-blocked, so a dropped or right-clicked web image can be stored as a local data URL. Canvas-drawing a *hotlinked* `<img>` would taint the canvas; fetch the blob instead.
+
+**Drag-out to the desktop = `DownloadURL`.** `dataTransfer.setData("DownloadURL", "mime:filename:url")` on `dragstart` makes Chrome write a real file where the image is dropped (data URLs work). Async clipboard image writes must be `image/png`; pass the Blob *promise* to `ClipboardItem` so encoding doesn't outlive the user gesture.
+
 **Margin Numbers ride CSS counters on the editor's block sequence — no DOM/markup change.** `.editor.numbered` resets `mn`; each top-level child increments it and renders `counter(mn)` in the left gutter (absolute `::before`, positioned into extra `padding-left`). Lists/tables instead reset a second `mnsub` and render `counter(mn) "." counter(mnsub)` on their `li`/`tr` — and the container's *own* number is deliberately **not** drawn, because it would collide with `n.1` on the first line. So a list is section "12" only implicitly; its rows are 12.1, 12.2. The toggle is a per-note property (`n.numbered`), applied as a class on the editor element — it lives outside the note HTML, so the sanitizer never sees it.
 
 **Whole-note text scaling is just the editor's base `font-size`.** Headings, badges, quotes, code are all `em`-based, so one class on `.editor` (`size-small|regular|large|supersize`) scales everything proportionally. The only px holdout was `pre`, switched to `em` to come along. It's a persisted *setting* (sticks across notes), not inline formatting.

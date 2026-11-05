@@ -23,6 +23,12 @@ The *second* thing these dumps reveal: the **editor itself is maturing** — lis
 - **Default theme — dark.** The side panel opens in dark mode by default.
 - **"Badge," never "highlight."** Highlight as a concept is retired; the term and the tool are *badge* everywhere.
 
+### ✅ Shipped in v0.14.0 (Editor overhaul + Images #14)
+
+**Text editor bug pass.** The block layer (styles, lists, checklists, indent, paste) moved off `document.execCommand` onto a line engine (`editor-engine.js`): explode the touched blocks into lines, edit line properties, rebuild canonical markup. Fixed **B6** (re-applied H1/H2 compounding size), **B7** (bullets producing `<p><ul>` and scrambling text), **B8** (checklist on a multi-line selection cramming every line into one item, with a mismatched meter), plus Chrome's style-span injection on block merges. Checklists gained nesting, sub-task counts, and Docs-style Enter/Backspace. Pastes from Docs / Notion / GitHub / the web are normalized; plain-text bullets become lists. The editor now owns undo/redo (snapshot history).
+
+**Images (#14) shipped.** Paste screenshots and copied images, drop files, drag images off web pages, right-click **Save image to Margin** (with citation); remote images are stored locally. Out: hover Copy / Download (pill pattern, legible over any image), click + `⌘C`, drag-out to the desktop as a real file, native Save image as. **Next in the theme:** #15 (other file types) and an in-note image viewer (click to see full size; the panel is narrow).
+
 ### ✅ Shipped in v0.11.0 (Azure UI)
 
 The first large front-end update: the **"Azure" brand** from the Claude Design handoff, plus the net-new surfaces it locked. The token re-theme (two-tier surfaces, slate-blue chrome accent, `--hairline`/`--mn-rail`/`--ok`) and local **Hanken Grotesk + JetBrains Mono** fonts landed first, then **Connected pages** (the `sources[]` set (#4) surfaced as a favicon chip row + connect/disconnect drawer), **Table of Contents (#13)** (a per-note translucent outline bar + frosted heading dropdown + scroll-progress), the **note ⋯ menu realignment** (icons, live accessories, Pin → Favorite, Markdown export alongside .html), and a glyph-based **save state** (check / pulsing dot / ×, never color-alone). The prototype's full-screen save-error flow was intentionally deferred — Margin saves to `chrome.storage.local`, so there is no network sync backend to troubleshoot.
@@ -72,6 +78,12 @@ Nav/UX overhaul landed: **blue icon** (one mid-tone glyph legible on every surfa
 - **Lift:** S.
 
 **B4. Locked note is ignored when sending from a webpage** — ✅ **resolved.** Capture moved panel-side: the panel owns note targeting, so a LOCKED note now keeps the capture (it appends to the open/last note, not the tab's note). Paste-from-page (#5) reuses this path. *(Was: M.)*
+
+**B6. Re-applying Title/Heading keeps growing the text**: ✅ **resolved v0.14.0.** `formatBlock` inside a list item nested headings (`<h1><h1><h1><ul>`), and em-based heading sizes compounded per press. Block styles now go through the line engine and are idempotent.
+
+**B7. Bullets do weird things in the text area**: ✅ **resolved v0.14.0.** `insertUnorderedList` produced invalid `<p><ul>` nesting, scrambled text order when typed into, and shredded checklists. Lists are rebuilt as valid, canonical markup.
+
+**B8. Checklist on multi-line selection crams everything into one item**: ✅ **resolved v0.14.0.** Only the anchor block was converted, and `<br>`-separated lines stayed in one item. Every selected line now becomes its own item; old crammed items split back apart on toggle.
 
 **B5. Sent content always lands at the end** — ✅ **resolved.** The panel tracks the note's last caret range and inserts the capture there, not at the end. Same capture path as B4. *(Was: M.)*
 
@@ -138,7 +150,7 @@ Nav/UX overhaul landed: **blue icon** (one mid-tone glyph legible on every surfa
 
 ## Theme — Rich media
 
-**14. Images — paste, drop, capture, manage**
+**14. Images: paste, drop, capture, manage**: ✅ **shipped v0.14.0** (all four bullets below, plus click + `⌘C`, drag-out to desktop, and local copies of remote images).
 - Paste images from clipboard into a note.
 - Drag/drop images into a note.
 - Add **"Add to Margin"** to the right-click menu on a **webpage image** (today it only appears for selected text).
@@ -151,6 +163,22 @@ Nav/UX overhaul landed: **blue icon** (one mid-tone glyph legible on every surfa
 - **Clear per-type filesize constraints** to keep notes from bloating and the panel fast — the load-bearing constraint of the whole feature.
 - **Watch:** local storage has limits; large media as data URLs will pressure `unlimitedStorage`. Caps + maybe thumbnail-only-for-heavy-types is the speed safeguard.
 - **Lift:** L.
+
+**15b. In-note image viewer** *(new, from the v0.14 build)*: click an image to see it full size in a lightbox (the side panel is narrow, so screenshots of whole pages get small). Arrow keys step through a note's images. **Lift:** S–M.
+
+---
+
+## Theme: Claude in the canvas *(new idea dump, for later)*
+
+**22. Bring-your-own Claude API key**: a settings panel to paste an Anthropic API key (stored locally only, with a clear "this key never leaves your machine except to call the API" note and a test-connection button). The foundation for everything below. **Touches:** a settings surface (the full settings page from the Azure handoff is the natural home), `chrome.storage.local`, a background-worker call path. **Watch:** key storage hygiene (never synced, never logged, easy revoke) and per-call cost visibility. **Lift:** M.
+
+**23. AI actions on a note**: one-click commands that act on the open note (or the selection):
+- **Polish** this note (tighten wording, keep my voice).
+- **Format to scan** (headings, bullets, bolded key terms).
+- **Clean up chicken scratch** (turn fragments into readable notes without inventing facts).
+- **Organize the images** in this note into a clean, captioned note.
+- **Send to a new Claude session** (hand the note's contents to claude.ai as a fresh conversation).
+**Design notes:** results land as an *undoable* replacement (the v0.14 editor history makes this one `⌘Z`), or as a side-by-side preview to accept. Provenance stays intact (sourced blocks keep their `data-src`). Image actions need vision input, so images go as base64 from the note. **Lift:** M–L. **Depends on:** #22.
 
 ---
 
@@ -178,7 +206,8 @@ Nav/UX overhaul landed: **blue icon** (one mid-tone glyph legible on every surfa
 - **Phase 1 — Editor wins that don't need new data:** ✅ **shipped in v0.6.0** — Margin Numbers (#7), Lists (#8), Text size (#10), Selection count (#11), Title hover (#18), Default dark (#17). *(Contextual title #19 and the nav/icon work shipped in v0.5.0.)*
 - **Phase 2 — The `sources[]` model (#4) → Merge (#3) → Note info (#2).** ✅ #4 shipped v0.7.0; ✅ Merge (#3) shipped v0.8.0; ✅ Note info (#2) shipped v0.9.0 — Phase 2 complete. **Remaining Theme-1 slice:** bulk **pin** (#1). **Next theme: Phase 3 — Provenance & capture** (Paste-from-page #5 + provenance display #6, shipped as a pair; B4/B5 fold into the same capture path).
 - **Phase 3 — Provenance & capture:** ✅ **shipped v0.10.0** — Paste-from-page (#5) + provenance display (#6), as a pair. Free-form-paste tagging deliberately skipped (unreliable source).
-- **Phase 4 — Rich media:** Images (#14) → filetypes (#15). Media before TOC since they're more-used.
+- **Phase 4: Rich media:** ✅ Images (#14) shipped v0.14.0 → image viewer (#15b) → filetypes (#15).
+- **Phase 6: Claude in the canvas:** API key settings (#22) → AI note actions (#23).
 - **Phase 5 — Structure & reach:** TOC (#13), then `.docx`/Google Docs export (#16).
 - **Decide first:** Selection toolbar (#9 — resolved to badge; just confirm placement). Spell-check is scrapped; icon polarity is solved.
 

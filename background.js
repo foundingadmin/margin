@@ -4,6 +4,7 @@
 // - fetchMeta(url): pull Open Graph title/description/image for link cards.
 
 const CAPTURE_ID = "margin_capture_selection";
+const CAPTURE_IMG_ID = "margin_capture_image";
 const OPEN_KEY = "margin.openWindows"; // chrome.storage.session: windowIds with the panel open (survives worker sleep)
 const openPanels = new Map(); // windowId -> Port (in-memory mirror; the panel reconnects to keep this warm)
 
@@ -32,6 +33,7 @@ function shortStamp(d = new Date()) {
 chrome.runtime.onInstalled.addListener(() => {
   chrome.contextMenus.removeAll(() => {
     chrome.contextMenus.create({ id: CAPTURE_ID, title: "Save selection to Margin", contexts: ["selection"] });
+    chrome.contextMenus.create({ id: CAPTURE_IMG_ID, title: "Save image to Margin", contexts: ["image"] });
   });
 });
 
@@ -102,6 +104,7 @@ async function pasteFromPage(tab) {
    the quote as a pendingCapture; the panel inserts it — into the locked/open note at the
    caret (B4 + B5), else into the page's note. This also removes the panel/worker write race. */
 chrome.contextMenus.onClicked.addListener((info, tab) => {
+  if (info.menuItemId === CAPTURE_IMG_ID) return captureImage(info, tab);
   if (info.menuItemId !== CAPTURE_ID) return;
   const text = (info.selectionText || "").trim();
   if (!text) return;
@@ -114,6 +117,23 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
   const html = `<blockquote>${inner}</blockquote>${src}`;
   chrome.storage.session.set({ "margin.pendingCapture": { at: Date.now(), html, url, host: host || null, pageKey: pk || null, title: (tab && tab.title) || "" } });
 });
+
+/* ---------- image capture (right-click a web image) ----------
+   Same hand-off as text capture: the worker opens the panel (sync, keeping the gesture) and
+   stashes an <img> + citation; the panel fetches the bytes and stores a local copy in the note,
+   so the image survives the page changing. mode:"image" tells the panel to localize it. */
+function captureImage(info, tab) {
+  const src = info.srcUrl || "";
+  if (!/^(https?:|data:image\/)/i.test(src)) return;
+  if (tab && tab.windowId != null) chrome.sidePanel.open({ windowId: tab.windowId }).catch(() => {});
+  const url = info.pageUrl || (tab && tab.url) || "";
+  const host = hostOf(url);
+  const pk = pageKeyOf(url);
+  const name = (() => { try { return decodeURIComponent(new URL(src).pathname.split("/").pop() || "").replace(/\.[a-z0-9]{2,5}$/i, "").replace(/[_-]+/g, " ").trim(); } catch (e) { return ""; } })();
+  const cite = url ? `<p class="src"><a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(host || "source")}</a> · ${shortStamp()}</p>` : "";
+  const html = `<img src="${escapeHtml(src)}" alt="${escapeHtml(name || "Image")}">${cite}`;
+  chrome.storage.session.set({ "margin.pendingCapture": { at: Date.now(), mode: "image", html, url, host: host || null, pageKey: pk || null, title: (tab && tab.title) || "" } });
+}
 
 /* ---------- link-card metadata ---------- */
 function decodeEntities(s) {
