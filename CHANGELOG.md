@@ -1,5 +1,14 @@
 # Margin — version log
 
+## v0.15.0 (2026-11-05)
+
+Hands-free updates for unpacked installs.
+
+- **Margin reloads itself when its files change.** The worker reads `manifest.json` from disk (`fetch(chrome.runtime.getURL(...), {cache: "no-store"})`; Chrome serves unpacked files live) and calls `chrome.runtime.reload()` when the version on disk differs from the running one. Checked on worker start, when the panel opens or closes, and every minute via `chrome.alarms` (new `alarms` permission). After a merge, running the updater (or the desktop **Update Margin** app) is the whole update: no ↻ click in `chrome://extensions`.
+- **Never closes the panel on you.** A reload closes the side panel, so while it's open Margin shows a "Margin x.y.z is ready" toast with **Reload now** (it flushes the pending save first) and otherwise installs the update as soon as you close the panel.
+- **Safe by construction**: only for `installType: "development"` (a store install updates through Chrome), waits for the version on disk to hold for 3 s so it can't reload mid-checkout, ignores a half-written manifest, and reloads at most once per version (guard in `chrome.storage.local`, since session storage is wiped by the reload).
+- **`update-margin.command`** no longer opens `chrome://extensions` or asks for ↻ after an update (it still does on a first-time clone, where you need Load unpacked). README "Stay in sync" covers the desktop-app flow.
+
 ## v0.14.0 (2026-11-04)
 
 Text editor overhaul (bug fixes) + images.

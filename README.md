@@ -5,7 +5,7 @@ A fast, tab-aware notepad that lives in your Chrome side panel. Now a real block
 ## Install / update (unpacked)
 1. Unzip `margin-extension.zip`.
 2. Go to `chrome://extensions`, enable **Developer mode** (top-right).
-3. **Load unpacked** → pick the folder. (Updating from a previous version? Just hit the reload ↻ on the Margin card.)
+3. **Load unpacked** → pick the folder. (Updating from a version before 0.15.0? Hit the reload ↻ on the Margin card once; from 0.15.0 on, an unpacked Margin reloads itself when its files change.)
 4. Open it with the toolbar icon or **⌘/Ctrl+Shift+E**.
 
 ## Stay in sync with `main` (dev)
@@ -16,7 +16,10 @@ Want to track the repo instead of re-downloading a zip? Chrome can't load an unp
    git clone https://github.com/foundingadmin/margin.git "$HOME/Custom Apps/margin"
    ```
    Then **Load unpacked** → pick that `margin` folder.
-2. **After any merge to `main`**, double-click **`update-margin.command`** in the folder (it pulls the latest and pops open `chrome://extensions` in **Comet**), then hit the reload ↻ on the Margin card.
+2. **After any merge to `main`**, run the updater: double-click the **Update Margin** app on your desktop if you have it (it runs the script below and shows a notification), or double-click **`update-margin.command`** in the folder. Either way it pulls the latest `main` into the folder.
+3. **That's it.** Margin (0.15.0+) checks its own files every minute and reloads itself when the version on disk changes. If its side panel is open it won't yank it shut: you get a "Margin x.y.z is ready" notice with **Reload now**, and otherwise the update installs the moment you close the panel. Your notes live in `chrome.storage`, so a reload never touches them.
+
+> **Self-reload only works for an unpacked install** (Developer mode, Load unpacked) and keys off the `version` in `manifest.json`, so bump the version in every release you want to land on its own. The first update *to* 0.15.0 still needs one manual ↻ on the Margin card, because the version you're running doesn't know how to reload itself yet.
 
 The script clones if the folder is missing, fast-forwards to `main` if it's already a checkout, and — if you *unzipped* the folder instead of cloning (so it has no `.git`) — converts it into a checkout in place on first run. It targets the Margin repo specifically: it will refuse to touch a parent folder that happens to be some *other* git repo (e.g. a home directory that's itself a checkout). Override the location with `MARGIN_DIR=…` if you keep it elsewhere.
 

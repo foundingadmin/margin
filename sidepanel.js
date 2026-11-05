@@ -1042,13 +1042,29 @@ async function bulkMerge() {
 /* ---------- transient undo toast ---------- */
 let toastTimer = null;
 function hideToast() { clearTimeout(toastTimer); toastTimer = null; const t = $("toast"); if (t) t.hidden = true; }
-function showToast(msg, onUndo) {
+function showToast(msg, onUndo, opts = {}) {
   const t = $("toast"); if (!t) return;
   $("toast-msg").textContent = msg;
   const undo = $("toast-undo"); undo.hidden = !onUndo;
+  undo.textContent = opts.label || "Undo";
   undo.onclick = onUndo ? () => { hideToast(); onUndo(); } : null;
   t.hidden = false;
-  clearTimeout(toastTimer); toastTimer = setTimeout(hideToast, 7000);
+  clearTimeout(toastTimer); toastTimer = setTimeout(hideToast, opts.ms || 7000);
+}
+
+/* ---------- update ready (unpacked dev installs) ----------
+   The worker never reloads while a panel is open, since a reload closes it. It tells us
+   instead: say so once per version, finish the pending save, and offer an immediate reload.
+   Closing the panel also completes the update (the worker reloads within a few seconds). */
+let updateNoticeFor = null;
+function showUpdateReady(version) {
+  if (!version || version === updateNoticeFor) return;
+  updateNoticeFor = version;
+  showToast(`Margin ${version} is ready. It installs when you close the panel.`, async () => {
+    clearTimeout(saveTimer); saveTimer = null;
+    if (activeNote()) await saveNotes();
+    chrome.runtime.reload();
+  }, { label: "Reload now", ms: 15000 });
 }
 
 /* ---------- tab context + follow ---------- */
@@ -1205,6 +1221,11 @@ const GUIDE_HTML = `
 <p>Notes live locally via <code>chrome.storage.local</code> and never leave your machine. Broad host access exists only so link cards can fetch a URL's preview; no scripts run on pages.</p>
 `;
 const CHANGELOG_HTML = `
+<div class="ver"><span class="ver-tag">v0.15.0</span><span class="ver-date">Nov 5, 2026</span></div>
+<ul>
+<li><strong>Updates install themselves</strong>: when a newer Margin lands in its folder, it reloads on its own within about a minute. No more ↻ in the extensions page.</li>
+<li><strong>Never mid-thought</strong>: if the panel is open you get a quiet “ready” notice with <strong>Reload now</strong>; otherwise the update waits until you close the panel. Notes are untouched either way.</li>
+</ul>
 <div class="ver"><span class="ver-tag">v0.14.0</span><span class="ver-date">Nov 4, 2026</span></div>
 <ul>
 <li><strong>Text styles you can trust</strong>: re-applying Title or Heading no longer keeps growing the text, bullets no longer scramble the layout, and every style is applied line by line, so selecting three lines and pressing a style or list gives you three styled lines.</li>
@@ -1565,7 +1586,10 @@ function exportNote(fmt) {
   const connect = () => {
     try {
       port = chrome.runtime.connect({ name: "panel:" + wid });
-      port.onMessage.addListener((m) => { if (m && m.type === "close") window.close(); });
+      port.onMessage.addListener((m) => {
+        if (m && m.type === "close") window.close();
+        else if (m && m.type === "updateReady") showUpdateReady(m.version);
+      });
       port.onDisconnect.addListener(() => { port = null; setTimeout(connect, 200); });
     } catch (e) { port = null; }
   };

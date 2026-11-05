@@ -30,6 +30,8 @@ The side panel's top strip (app name, pin, close) is **Chrome-drawn and uncontro
 
 **Spellcheck suggestions are not exposed to JS.** The red squiggle is browser-drawn; there's no API to read its suggestions. One-click-correct would require bundling our own dictionary — explicitly scrapped.
 
+**Unpacked extensions read their files live from disk, but the manifest and worker only reload on `chrome.runtime.reload()`.** A `fetch(chrome.runtime.getURL("manifest.json"), {cache: "no-store"})` sees an edited manifest immediately while `chrome.runtime.getManifest()` still reports the running one. That gap is how self-reload works (verified in Chromium 153: edit on disk, fetch shows it, reload lands the new version, alarm-driven within a minute). Two gotchas: `chrome.storage.session` is wiped by a reload, so a "don't reload twice" guard has to live in `storage.local`; and an extension loaded with `--load-extension` while Developer mode is off gets disabled on reload (`unsupportedDeveloperExtension`), so test with Developer mode on, like a real Load unpacked.
+
 **Fetch your own packaged files** with `fetch(chrome.runtime.getURL("FILE"))` from the panel page — same-origin, no `web_accessible_resources` needed. (Used to render ROADMAP.md in-app.)
 
 ---
