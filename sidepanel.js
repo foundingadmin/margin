@@ -1042,13 +1042,29 @@ async function bulkMerge() {
 /* ---------- transient undo toast ---------- */
 let toastTimer = null;
 function hideToast() { clearTimeout(toastTimer); toastTimer = null; const t = $("toast"); if (t) t.hidden = true; }
-function showToast(msg, onUndo) {
+function showToast(msg, onUndo, opts = {}) {
   const t = $("toast"); if (!t) return;
   $("toast-msg").textContent = msg;
   const undo = $("toast-undo"); undo.hidden = !onUndo;
+  undo.textContent = opts.label || "Undo";
   undo.onclick = onUndo ? () => { hideToast(); onUndo(); } : null;
   t.hidden = false;
-  clearTimeout(toastTimer); toastTimer = setTimeout(hideToast, 7000);
+  clearTimeout(toastTimer); toastTimer = setTimeout(hideToast, opts.ms || 7000);
+}
+
+/* ---------- update ready (unpacked dev installs) ----------
+   The worker never reloads while a panel is open, since a reload closes it. It tells us
+   instead: say so once per version, finish the pending save, and offer an immediate reload.
+   Closing the panel also completes the update (the worker reloads within a few seconds). */
+let updateNoticeFor = null;
+function showUpdateReady(version) {
+  if (!version || version === updateNoticeFor) return;
+  updateNoticeFor = version;
+  showToast(`Margin ${version} is ready. It installs when you close the panel.`, async () => {
+    clearTimeout(saveTimer); saveTimer = null;
+    if (activeNote()) await saveNotes();
+    chrome.runtime.reload();
+  }, { label: "Reload now", ms: 15000 });
 }
 
 /* ---------- tab context + follow ---------- */
@@ -1565,7 +1581,10 @@ function exportNote(fmt) {
   const connect = () => {
     try {
       port = chrome.runtime.connect({ name: "panel:" + wid });
-      port.onMessage.addListener((m) => { if (m && m.type === "close") window.close(); });
+      port.onMessage.addListener((m) => {
+        if (m && m.type === "close") window.close();
+        else if (m && m.type === "updateReady") showUpdateReady(m.version);
+      });
       port.onDisconnect.addListener(() => { port = null; setTimeout(connect, 200); });
     } catch (e) { port = null; }
   };

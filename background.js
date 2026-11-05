@@ -49,7 +49,9 @@ chrome.runtime.onConnect.addListener((port) => {
     // Only clear when this exact port dies. If the worker is being torn down the panel
     // reconnects and re-registers, so the map stays accurate while a panel is open.
     if (openPanels.get(wid) === port) { openPanels.delete(wid); persistOpen(); }
+    setTimeout(checkForUpdate, 1500); // a deferred self-reload can run once the panel is gone
   });
+  checkForUpdate(); // panel just opened: if a newer build is on disk, tell it (never yank it closed)
 });
 // The toggle decision must stay synchronous so sidePanel.open() keeps its user-gesture token:
 // read the in-memory map (kept warm by the panel's reconnect), never await storage before open().
@@ -171,3 +173,67 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return true; // async response
   }
 });
+
+/* ---------- self-reload for unpacked (dev) installs ----------
+   Margin is loaded unpacked from a git checkout that update-margin.command keeps on main.
+   Chrome serves an unpacked extension's files straight from disk, but only re-reads the
+   manifest and restarts this worker on an explicit reload. So: read manifest.json from disk,
+   and when its version differs from the running one, call chrome.runtime.reload() ourselves.
+   - Only for installType "development"; a store install updates through Chrome as usual.
+   - Checked on worker start, on panel open/close, and every minute (chrome.alarms).
+   - Never while a panel is open (a reload closes it): the panel gets an "update ready"
+     notice instead, and the reload happens as soon as it closes, or on "Reload now".
+   - Waits for the version on disk to hold steady for a few seconds so a reload can't land
+     halfway through a git checkout, and reloads at most once per version (loop guard). */
+const UPDATE_ALARM = "margin_update_check";
+const RELOAD_GUARD_KEY = "margin.selfReloadedFor"; // chrome.storage.local (session storage is wiped by a reload)
+let devInstallP = null;
+function isDevInstall() {
+  if (!devInstallP) devInstallP = new Promise((resolve) => {
+    const fallback = () => resolve(!("update_url" in chrome.runtime.getManifest())); // store installs carry update_url
+    try {
+      if (!chrome.management || !chrome.management.getSelf) return fallback();
+      chrome.management.getSelf((info) => { if (chrome.runtime.lastError || !info) fallback(); else resolve(info.installType === "development"); });
+    } catch (e) { fallback(); }
+  });
+  return devInstallP;
+}
+async function diskVersion() {
+  try {
+    const r = await fetch(chrome.runtime.getURL("manifest.json") + "?t=" + Date.now(), { cache: "no-store" });
+    if (!r.ok) return null;
+    const v = (await r.json()).version;
+    return typeof v === "string" ? v : null;
+  } catch (e) { return null; } // missing or half-written mid-update: try again next tick
+}
+async function panelIsOpen() {
+  if (chrome.runtime.getContexts) {
+    try { return (await chrome.runtime.getContexts({ contextTypes: ["SIDE_PANEL"] })).length > 0; } catch (e) {}
+  }
+  return openPanels.size > 0; // older Chromium: trust the port map (errs toward "open" = no reload)
+}
+function tellPanels(version) {
+  for (const port of openPanels.values()) { if (port) { try { port.postMessage({ type: "updateReady", version }); } catch (e) {} } }
+}
+let updateCheck = null;
+function checkForUpdate() { return updateCheck || (updateCheck = runUpdateCheck().catch(() => {}).finally(() => { updateCheck = null; })); }
+async function runUpdateCheck() {
+  if (!(await isDevInstall())) return;
+  const running = chrome.runtime.getManifest().version;
+  const v = await diskVersion();
+  if (!v || v === running) return;
+  await new Promise((r) => setTimeout(r, 3000)); // let an in-flight checkout finish
+  if ((await diskVersion()) !== v) return;
+  if (await panelIsOpen()) { tellPanels(v); return; }
+  const guard = (await chrome.storage.local.get(RELOAD_GUARD_KEY))[RELOAD_GUARD_KEY];
+  if (guard === v) return; // already reloaded for this version once and it didn't take: don't loop
+  await chrome.storage.local.set({ [RELOAD_GUARD_KEY]: v });
+  chrome.runtime.reload();
+}
+isDevInstall().then((dev) => {
+  if (!dev) { chrome.alarms && chrome.alarms.clear(UPDATE_ALARM); return; }
+  // get-then-create: re-creating on every worker wake would keep pushing the alarm back.
+  chrome.alarms.get(UPDATE_ALARM, (a) => { if (!a) chrome.alarms.create(UPDATE_ALARM, { periodInMinutes: 1 }); });
+  checkForUpdate();
+});
+if (chrome.alarms) chrome.alarms.onAlarm.addListener((a) => { if (a.name === UPDATE_ALARM) checkForUpdate(); });
